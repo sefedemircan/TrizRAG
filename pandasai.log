@@ -1,0 +1,37 @@
+2025-08-17 21:37:50 [INFO] Question: What is the average age
+2025-08-17 21:37:50 [INFO] Running PandasAI with litellm LLM...
+2025-08-17 21:37:50 [INFO] Prompt ID: fbbd7ff4-1201-4781-865d-0eb08a9fa46b
+2025-08-17 21:37:50 [INFO] Generating new code...
+2025-08-17 21:37:58 [INFO] Code Generated:
+# import the required dependencies
+import pandas as pd
+
+# Define the SQL query to calculate the average age
+sql_query = """
+    SELECT AVG(age) AS average_age
+    FROM table_tmpj92r3s06
+"""
+
+# Execute the SQL query
+df_result = execute_sql_query(sql_query)
+
+# Extract the value of the average age from the DataFrame
+average_age = df_result.iloc[0]['average_age']
+
+# Declare result var:
+result = {
+    "type": "number",
+    "value": average_age
+}
+2025-08-17 21:37:59 [INFO] Validating code requirements...
+2025-08-17 21:37:59 [INFO] Code validation successful.
+2025-08-17 21:37:59 [INFO] Cleaning the generated code...
+2025-08-17 21:37:59 [INFO] Executing code: import pandas as pd
+sql_query = """
+    SELECT AVG(age) AS average_age
+    FROM table_tmpj92r3s06
+"""
+df_result = execute_sql_query(sql_query)
+average_age = df_result.iloc[0]['average_age']
+result = {'type': 'number', 'value': average_age}
+2025-08-17 21:37:59 [INFO] Response generated successfully.
