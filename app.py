@@ -12,38 +12,10 @@ import requests
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-import pandasai as pai
-from pandasai_litellm.litellm import LiteLLM
-import pandas as pd
-from pandasai import SmartDataframe
+
 
 # .env dosyasını yükle
 load_dotenv()
-
-# pandasai konfigürasyonu
-def setup_pandasai():
-    """pandasai için LiteLLM konfigürasyonu"""
-    try:
-        openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-        if openrouter_api_key:
-            # OpenRouter API key'i environment variable olarak ayarla
-            os.environ["OPENROUTER_API_KEY"] = openrouter_api_key
-            
-            # LiteLLM ile LLM oluştur
-            llm = LiteLLM(model="openrouter/mistralai/mistral-small-3.1-24b-instruct:free")
-            
-            # pandasai konfigürasyonu - verilen örnekteki gibi
-            pai.config.set({
-                "llm": llm
-            })
-            
-            return True
-        else:
-            st.warning("⚠️ pandasai için OPENROUTER_API_KEY bulunamadı")
-            return False
-    except Exception as e:
-        st.error(f"pandasai konfigürasyon hatası: {e}")
-        return False
 
 # Sayfa konfigürasyonu
 st.set_page_config(
@@ -173,13 +145,11 @@ class AdvancedRAGSystem:
         self.collection_name = "rag-poc-collection"
         # OpenRouter API key'i .env'den otomatik al
         self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-        self.dimension = 384  # all-MiniLM-L6-v2 embedding boyutu
+        self.dimension = 1024  # all-MiniLM-L6-v2 embedding boyutu
         self.chroma_api_key = os.getenv("CHROMA_API_KEY")
         self.chroma_tenant = os.getenv("CHROMA_TENANT")
         self.chroma_database = os.getenv("CHROMA_DATABASE")
-        # pandasai için DataFrame'ler
-        self.dataframes = {}
-        self.pandasai_configured = False
+        
 
     def initialize_chromadb(self):
         """ChromaDB Cloud'u başlat"""
@@ -197,7 +167,7 @@ class AdvancedRAGSystem:
             
             # Embedding function oluştur
             embedding_function = SentenceTransformerEmbeddingFunction(
-                model_name='all-MiniLM-L6-v2'
+                model_name='intfloat/multilingual-e5-large'
             )
             
             # Collection'ı oluştur veya al
@@ -218,92 +188,13 @@ class AdvancedRAGSystem:
             st.error(f"ChromaDB Cloud bağlantı hatası: {e}")
             return False
 
-    def initialize_pandasai(self):
-        """pandasai'ı başlat"""
-        try:
-            self.pandasai_configured = setup_pandasai()
-            return self.pandasai_configured
-        except Exception as e:
-            st.error(f"pandasai başlatma hatası: {e}")
-            return False
-
-    def add_dataframe(self, name: str, df: pd.DataFrame) -> bool:
-        """DataFrame ekle"""
-        try:
-            # pandasai DataFrame'i olarak oluştur
-            # Önce CSV olarak kaydet, sonra pandasai ile oku
-            import tempfile
-            import os
-            
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as tmp_file:
-                df.to_csv(tmp_file.name, index=False)
-                tmp_path = tmp_file.name
-            
-            # pandasai ile CSV'yi oku
-            pai_df = pai.read_csv(tmp_path)
-            
-            # Geçici dosyayı sil
-            os.unlink(tmp_path)
-            
-            # pandasai DataFrame'i sakla
-            self.dataframes[name] = pai_df
-            return True
-        except Exception as e:
-            st.error(f"DataFrame ekleme hatası: {e}")
-            return False
-
-    def get_dataframe(self, name: str):
-        """DataFrame getir"""
-        return self.dataframes.get(name)
-
-    def list_dataframes(self) -> List[str]:
-        """Mevcut DataFrame'lerin listesini getir"""
-        return list(self.dataframes.keys())
-
-    def chat_with_dataframe(self, df_name: str, query: str) -> str:
-        """DataFrame ile sohbet et"""
-        if not self.pandasai_configured:
-            return "❌ pandasai henüz yapılandırılmadı!"
-        
-        if df_name not in self.dataframes:
-            return f"❌ '{df_name}' adında DataFrame bulunamadı!"
-        
-        try:
-            df = self.dataframes[df_name]
-            # Verilen örnekteki gibi basit pandasai kullanımı
-            response = df.chat(query)
-            return str(response)
-        except Exception as e:
-            return f"❌ DataFrame sohbet hatası: {e}"
-
-    def analyze_dataframe(self, df_name: str) -> Dict:
-        """DataFrame analizi"""
-        if df_name not in self.dataframes:
-            return {"error": f"'{df_name}' adında DataFrame bulunamadı!"}
-        
-        try:
-            pai_df = self.dataframes[df_name]
-            # pandasai DataFrame'den orijinal pandas DataFrame'i al
-            df = pai_df._df if hasattr(pai_df, '_df') else pai_df
-            
-            analysis = {
-                "shape": df.shape,
-                "columns": list(df.columns),
-                "dtypes": df.dtypes.to_dict(),
-                "missing_values": df.isnull().sum().to_dict(),
-                "numeric_columns": df.select_dtypes(include=[np.number]).columns.tolist(),
-                "categorical_columns": df.select_dtypes(include=['object']).columns.tolist(),
-                "sample_data": df.head(5).to_dict('records')
-            }
-            return analysis
-        except Exception as e:
-            return {"error": f"Analiz hatası: {e}"}
+    
 
     @st.cache_resource
     def load_embedding_model(_self):
         """Embedding modelini yükle"""
         try:
-            _self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+            _self.embedding_model = SentenceTransformer('intfloat/multilingual-e5-large')
             return True
         except Exception as e:
             st.error(f"Embedding model yükleme hatası: {e}")
@@ -427,7 +318,7 @@ class AdvancedRAGSystem:
                         semantic_results['metadatas'][0], 
                         semantic_results['distances'][0]
                     )):
-                        similarity_score = 1 - distance
+                        similarity_score = max(0.0, 1 - distance)
                         all_results.append({
                             "text": doc,
                             "score": similarity_score * 0.5,  # Semantic ağırlığı
@@ -617,10 +508,9 @@ def main():
                 embedding_success = rag_system.load_embedding_model()
                 # ChromaDB başlat
                 chromadb_success = rag_system.initialize_chromadb()
-                # pandasai başlat
-                pandasai_success = rag_system.initialize_pandasai()
+                
 
-                if embedding_success and chromadb_success and pandasai_success:
+                if embedding_success and chromadb_success:
                     st.success("✅ TrizRAG successfully initialized!")
                     st.rerun()
                 else:
@@ -683,14 +573,7 @@ def main():
         </div>
         """, unsafe_allow_html=True)
 
-        # pandasai durumu
-        pandasai_status = "🟢 Configured" if rag_system.pandasai_configured else "🔴 Not Configured"
-        st.markdown(f"""
-        <div style="display: flex; align-items: center; margin: 0.5rem 0;">
-            <span class="status-indicator {'status-connected' if rag_system.pandasai_configured else 'status-disconnected'}"></span>
-            <span><strong>pandasai:</strong> {pandasai_status}</span>
-        </div>
-        """, unsafe_allow_html=True)
+        
 
         # ChromaDB Cloud bilgileri
 
@@ -717,7 +600,7 @@ def main():
             1. Click "Initialize System" to start
             2. Upload documents in RAG tab
             3. Ask questions about your documents
-            4. Upload data in pandasai tab for analysis
+            
             
             **💡 Tips:**
             - Use semantic search for best results
@@ -892,189 +775,6 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
                                 st.divider()
                     else:
                         st.warning("⚠️ No relevant information found. Try lowering the similarity threshold.")
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # Tab 2: Data Analytics (pandasai)
-    with tab2:
-        st.markdown('<div class="tab-content">', unsafe_allow_html=True)
-        
-        # Help tooltip
-        st.markdown("""
-        <div class="help-tooltip">
-            <strong>💡 Data Analytics:</strong> Upload CSV files or enter data manually, then ask AI-powered questions about your data. 
-            TrizRAG will analyze your data and provide intelligent insights.
-        </div>
-        """, unsafe_allow_html=True)
-        
-        col1, col2 = st.columns([1, 1])
-        
-        with col1:
-            st.header("📁 Data Upload")
-            
-            # Modern upload area
-            st.markdown("""
-            <div class="upload-area">
-                <h4>📊 Upload Data</h4>
-                <p>Drag & drop or click to upload CSV files</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # CSV dosya yükleme
-            csv_file = st.file_uploader(
-                "Choose CSV file:",
-                type=['csv'],
-                key="csv_uploader",
-                label_visibility="collapsed"
-            )
-
-            if csv_file:
-                try:
-                    df = pd.read_csv(csv_file)
-                    df_name = csv_file.name.replace('.csv', '')
-                    
-                    if st.button(f"📊 Add '{df_name}' Dataset", type="primary", use_container_width=True):
-                        success = rag_system.add_dataframe(df_name, df)
-                        if success:
-                            st.success(f"✅ '{df_name}' dataset successfully added!")
-                            st.rerun()
-                        else:
-                            st.error("❌ Dataset addition failed!")
-                    
-                    # DataFrame önizleme
-                    st.subheader("👀 Data Preview")
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <h3 style="margin: 0; font-size: 1.5rem;">{df.shape[0]} × {df.shape[1]}</h3>
-                        <p style="margin: 0; opacity: 0.9;">Rows × Columns</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    st.dataframe(df.head(10))
-                    
-                except Exception as e:
-                    st.error(f"CSV reading error: {e}")
-
-            # Manuel veri girişi
-            st.subheader("✍️ Manual Data Input")
-            
-            # Örnek veri
-            sample_data = """name,age,city,salary
-Ahmet,25,İstanbul,5000
-Ayşe,30,Ankara,6000
-Mehmet,35,İzmir,7000
-Fatma,28,Bursa,5500
-Ali,32,Antalya,6500"""
-            
-            manual_data = st.text_area(
-                "Enter data in CSV format:",
-                value=sample_data,
-                height=150,
-                placeholder="Enter your data here..."
-            )
-            
-            if st.button("📊 Convert to Dataset", type="primary", use_container_width=True):
-                try:
-                    from io import StringIO
-                    df = pd.read_csv(StringIO(manual_data))
-                    df_name = "manual_data"
-                    
-                    success = rag_system.add_dataframe(df_name, df)
-                    if success:
-                        st.success(f"✅ '{df_name}' dataset successfully added!")
-                        st.rerun()
-                    else:
-                        st.error("❌ Dataset addition failed!")
-                        
-                except Exception as e:
-                    st.error(f"Data reading error: {e}")
-
-        with col2:
-            st.header("🗂️ Available Datasets")
-            
-            if rag_system.dataframes:
-                for df_name in rag_system.list_dataframes():
-                    pai_df = rag_system.get_dataframe(df_name)
-                    # pandasai DataFrame'den orijinal pandas DataFrame'i al
-                    df = pai_df._df if hasattr(pai_df, '_df') else pai_df
-                    
-                    with st.expander(f"📊 {df_name} ({df.shape[0]}×{df.shape[1]})"):
-                        st.dataframe(df.head(5))
-                        
-                        # DataFrame analizi
-                        if st.button(f"🔍 Analyze {df_name}", key=f"analyze_{df_name}"):
-                            analysis = rag_system.analyze_dataframe(df_name)
-                            if "error" not in analysis:
-                                st.write("**📈 Data Analysis:**")
-                                st.write(f"**Shape:** {analysis['shape']}")
-                                st.write(f"**Columns:** {', '.join(analysis['columns'])}")
-                                st.write(f"**Numeric Columns:** {', '.join(analysis['numeric_columns'])}")
-                                st.write(f"**Categorical Columns:** {', '.join(analysis['categorical_columns'])}")
-                                
-                                # Eksik veri analizi
-                                missing_data = {k: v for k, v in analysis['missing_values'].items() if v > 0}
-                                if missing_data:
-                                    st.write(f"**⚠️ Missing Values:** {missing_data}")
-                            else:
-                                st.error(analysis['error'])
-            else:
-                st.info("ℹ️ No datasets uploaded yet. Upload data from the left side!")
-
-        # pandasai Sohbet - Tam genişlik
-        if rag_system.pandasai_configured and rag_system.dataframes:
-            st.divider()
-            st.header("💬 AI Data Analysis")
-            
-            col3, col4 = st.columns([1, 1])
-            
-            with col3:
-                # DataFrame seçimi
-                selected_df = st.selectbox(
-                    "Select dataset:",
-                    rag_system.list_dataframes()
-                )
-                
-                # Sohbet sorusu
-                chat_query = st.text_input(
-                    "Ask about your data:",
-                    placeholder="Example: What is the average age? Who has the highest salary?",
-                    key="pandasai_chat"
-                )
-                
-                if st.button("🤖 Get AI Analysis", type="primary", use_container_width=True) and chat_query:
-                    with st.spinner("🤖 AI is analyzing your data..."):
-                        response = rag_system.chat_with_dataframe(selected_df, chat_query)
-                    
-                    st.subheader("🎯 AI Analysis")
-                    st.markdown(f"""
-                    <div class="success-message">
-                        {response}
-                    </div>
-                    """, unsafe_allow_html=True)
-            
-            with col4:
-                st.markdown("""
-                <div class="help-tooltip">
-                    <strong>💡 AI Data Analysis Tips:</strong>
-                    
-                    **📊 Basic Questions:**
-                    • "What is the average age?"
-                    • "Who has the highest salary?"
-                    
-                    **🔍 Advanced Analysis:**
-                    • "Show me salary distribution by city"
-                    • "What's the correlation between age and salary?"
-                    • "Create a summary of the data"
-                    
-                    **📈 Visualization Requests:**
-                    • "Plot age vs salary"
-                    • "Show city distribution"
-                </div>
-                """, unsafe_allow_html=True)
-        
-        elif not rag_system.pandasai_configured:
-            st.warning("⚠️ pandasai not configured yet!")
-        elif not rag_system.dataframes:
-            st.info("ℹ️ Please upload a dataset first!")
 
         st.markdown('</div>', unsafe_allow_html=True)
 
