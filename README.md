@@ -1,190 +1,123 @@
-# 🚀 TrizRAG - AI-Powered Document Intelligence Platform
+# 🚀 TrizRAG - AI-Powered Document Intelligence & Data Analytics Platform
 
-**Transform your documents and data into intelligent insights with the power of AI**
+TrizRAG, belgelerinizi ve verilerinizi yapay zeka ile analiz eden, doğal dil ile soru-cevap yapabilen ve veri görselleştirme özellikleri sunan kapsamlı bir platformdur.
 
-[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white)](https://streamlit.io/)
-[![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org/)
-[![ChromaDB](https://img.shields.io/badge/ChromaDB-0078D4?style=for-the-badge&logo=chromadb&logoColor=white)](https://chromadb.com/)
-[![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com/)
+## ✨ Özellikler
 
-## ✨ Features
+### 📚 Document Intelligence (RAG)
+- **Belge Yükleme**: TXT dosyaları yükleyin veya manuel metin girişi yapın
+- **AI-Powered Search**: Semantic, keyword ve hybrid arama seçenekleri
+- **Intelligent Q&A**: Belgeleriniz hakkında doğal dil ile soru sorun
+- **Vector Database**: ChromaDB Cloud ile güçlü vektör arama
 
-### 🔍 **Document Intelligence**
-- **Smart Document Upload**: Support for TXT files and manual text input
-- **AI-Powered Search**: Semantic, keyword, and hybrid search capabilities
-- **Intelligent Q&A**: Ask questions about your documents and get AI-generated answers
-- **Vector Database**: ChromaDB Cloud integration for efficient document storage and retrieval
+### 📊 Data Analytics
+- **Veri Yükleme**: CSV, Excel dosyalarını kolayca yükleyin
+- **AI-Powered Analysis**: Doğal dil ile veri analizi yapın
+- **Smart Visualizations**: Otomatik grafik önerileri ve görselleştirme
+- **Interactive Charts**: Plotly tabanlı interaktif grafikler
+- **Data Insights**: PandasAI ile akıllı veri analizi
 
-### 📊 **Data Analytics**
-- **CSV Data Import**: Upload and analyze CSV datasets
-- **AI Data Analysis**: Ask natural language questions about your data
-- **Smart Insights**: Get intelligent analysis and visualizations
-- **pandasai Integration**: Advanced AI-powered data manipulation
+### 🤖 AI Models
+- **Multiple LLMs**: WizardLM, Llama, Gemini, DeepSeek desteği
+- **OpenRouter Integration**: Farklı AI modellerine tek API üzerinden erişim
+- **PandasAI**: Veri analizi için özel AI asistanı
 
-### 🚀 **Advanced Capabilities**
-- **Multiple AI Models**: Support for various LLM providers via OpenRouter
-- **Real-time Processing**: Instant document indexing and search
-- **Scalable Architecture**: Cloud-ready vector database solution
-- **Modern UI/UX**: Beautiful, responsive web interface
+## 🚀 Kurulum
 
-## 🛠️ Technologies
-
-- **Frontend**: Streamlit (Modern Web UI)
-- **Vector Database**: ChromaDB Cloud
-- **AI Models**: OpenRouter (Multiple LLM providers)
-- **Data Analysis**: pandasai + pandas
-- **Embeddings**: SentenceTransformers
-- **Language**: Python 3.8+
-
-## 📋 Requirements
-
-- Python 3.8 or higher
-- OpenAI API key (via OpenRouter)
-- ChromaDB Cloud account
-- Internet connection for AI model access
-
-## 🚀 Quick Start
-
-### 1. **Clone Repository**
-```bash
-git clone <repository-url>
-cd trizrag
-```
-
-### 2. **Install Dependencies**
+### 1. Gereksinimler
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. **Environment Setup**
-Create a `.env` file in the project root:
+### 2. Environment Variables
+`.env` dosyası oluşturun ve gerekli API key'leri ekleyin:
+
 ```env
-# OpenRouter API Key (Get from: https://openrouter.ai/)
-OPENROUTER_API_KEY=your_api_key_here
+# OpenAI API Key (PandasAI için gerekli)
+OPENAI_API_KEY=your_openai_api_key_here
 
-# ChromaDB Cloud Credentials
-CHROMA_API_KEY=your_chroma_api_key
-CHROMA_TENANT=your_tenant_name
-CHROMA_DATABASE=your_database_name
+# OpenRouter API Key (LLM çağrıları için)
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+# ChromaDB Cloud API Key
+CHROMA_API_KEY=your_chroma_api_key_here
+
+# ChromaDB Cloud Tenant
+CHROMA_TENANT=your_chroma_tenant_here
+
+# ChromaDB Cloud Database
+CHROMA_DATABASE=your_chroma_database_here
 ```
 
-### 4. **Launch Application**
+### 3. Uygulamayı Çalıştırın
 ```bash
 streamlit run app.py
 ```
 
-### 5. **Access TrizRAG**
-Open your browser and navigate to: `http://localhost:8501`
+## 📖 Kullanım
 
-## 🎯 Usage Guide
+### Document Intelligence
+1. **Sistemi Başlatın**: Sidebar'dan "Initialize System" butonuna tıklayın
+2. **Belge Yükleyin**: TXT dosyaları yükleyin veya metin girişi yapın
+3. **Soru Sorun**: Belgeleriniz hakkında doğal dil ile soru sorun
+4. **AI Yanıtları**: AI, belgelerinizden bilgi çıkararak yanıt verir
 
-### **Document Intelligence**
-1. **Initialize System**: Click "Initialize System" in the sidebar
-2. **Upload Documents**: Add TXT files or paste text manually
-3. **Ask Questions**: Use natural language to query your documents
-4. **Get AI Answers**: Receive intelligent responses based on your content
+### Data Analytics
+1. **Veri Yükleyin**: CSV/Excel dosyası yükleyin veya örnek veri oluşturun
+2. **AI Analizi**: "Bu veri setinde kaç satır var?" gibi sorular sorun
+3. **Görselleştirme**: Otomatik grafik önerilerini kullanın
+4. **Özel Grafikler**: İstediğiniz grafik tipini ve sütunları seçin
 
-### **Data Analytics**
-1. **Upload Data**: Import CSV files or enter data manually
-2. **Select Dataset**: Choose from available datasets
-3. **Ask Questions**: Query your data in natural language
-4. **AI Analysis**: Get intelligent insights and visualizations
+## 🎯 Örnek Kullanım Senaryoları
 
-## 🤖 Supported AI Models
+### Belge Analizi
+- **Soru**: "Python'da hangi kütüphaneler makine öğrenmesi için kullanılır?"
+- **AI Yanıt**: Belgelerinizden scikit-learn, TensorFlow, PyTorch gibi kütüphaneleri bulur
 
-- **🚀 WizardLM-2 8x22B** (Free tier)
-- **🦙 Meta-Llama 3 8B** (Free tier)
-- **🌟 Google Gemini 2.5 Pro** (Free tier)
-- **🔍 DeepSeek R1** (Free tier)
+### Veri Analizi
+- **Soru**: "Kategorilere göre ortalama satış miktarını göster"
+- **AI Yanıt**: Veriyi analiz eder ve kategorilere göre ortalama satışları hesaplar
 
-## 🔑 API Keys
+## 🔧 Teknik Detaylar
 
-### **OpenRouter**
-- Visit [OpenRouter.ai](https://openrouter.ai/)
-- Create account and get API key
-- Add to `.env` file as `OPENROUTER_API_KEY`
+- **Frontend**: Streamlit
+- **Vector Database**: ChromaDB Cloud
+- **Embeddings**: Sentence Transformers (multilingual-e5-large)
+- **LLM Integration**: OpenRouter API
+- **Data Analysis**: PandasAI + OpenAI
+- **Visualization**: Plotly
 
-### **ChromaDB Cloud**
-- Visit [ChromaDB Cloud](https://cloud.chromadb.com/)
-- Create account and database
-- Get API key, tenant, and database name
-- Add to `.env` file
+## 📊 Desteklenen Dosya Formatları
 
-## 📁 Project Structure
+- **Documents**: TXT
+- **Data**: CSV, XLSX, XLS
 
-```
-trizrag/
-├── app.py                 # Main application
-├── requirements.txt       # Python dependencies
-├── .env                  # Environment variables
-├── README.md            # This file
-└── chroma_db/           # Local ChromaDB storage (if used)
-```
+## 🌟 Özellikler
 
-## 🎨 UI Features
+- **Multilingual Support**: Türkçe ve İngilizce desteği
+- **Real-time Processing**: Anlık belge ve veri analizi
+- **Cloud Integration**: ChromaDB Cloud ile ölçeklenebilir altyapı
+- **Interactive UI**: Modern ve kullanıcı dostu arayüz
+- **Export Options**: Grafikleri PNG olarak indirin
 
-- **Modern Design**: Beautiful gradient themes and modern components
-- **Responsive Layout**: Works on desktop, tablet, and mobile
-- **Interactive Elements**: Hover effects, loading states, and smooth transitions
-- **Professional Branding**: TrizRAG identity throughout the interface
+## 🤝 Katkıda Bulunma
 
-## 🔧 Configuration
+1. Fork yapın
+2. Feature branch oluşturun (`git checkout -b feature/AmazingFeature`)
+3. Commit yapın (`git commit -m 'Add some AmazingFeature'`)
+4. Push yapın (`git push origin feature/AmazingFeature`)
+5. Pull Request oluşturun
 
-### **Search Settings**
-- **Search Type**: Choose between semantic, keyword, or hybrid search
-- **Results Count**: Configure number of results returned
-- **Similarity Threshold**: Set minimum similarity score for results
+## 📄 Lisans
 
-### **AI Model Selection**
-- Switch between different LLM providers
-- Adjust model parameters for optimal performance
-- Free tier models available for testing
+Bu proje MIT lisansı altında lisanslanmıştır.
 
-## 📊 Performance
+## 📞 İletişim
 
-- **Fast Indexing**: Documents processed in real-time
-- **Efficient Search**: Vector similarity search with configurable thresholds
-- **Scalable Storage**: ChromaDB Cloud handles large document collections
-- **AI Response Time**: Typically 2-5 seconds depending on model and query complexity
-
-## 🚀 Deployment
-
-### **Local Development**
-```bash
-streamlit run app.py
-```
-
-### **Production Deployment**
-- Deploy to Streamlit Cloud
-- Use cloud-based ChromaDB
-- Configure environment variables
-- Scale based on usage requirements
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🆘 Support
-
-- **Documentation**: Check this README and inline code comments
-- **Issues**: Report bugs via GitHub Issues
-- **Community**: Join our community discussions
-
-## 🎉 Acknowledgments
-
-- **Streamlit**: For the amazing web framework
-- **ChromaDB**: For vector database technology
-- **OpenRouter**: For AI model access
-- **pandasai**: For intelligent data analysis
+- **Proje**: [GitHub Repository](https://github.com/yourusername/trizrag)
+- **Versiyon**: 1.0
+- **Güncelleme**: 2025
 
 ---
 
-**🚀 TrizRAG** - Transforming documents and data into intelligent insights since 2024 
+**🚀 TrizRAG ile belgelerinizi ve verilerinizi yapay zeka gücüyle analiz edin!** 

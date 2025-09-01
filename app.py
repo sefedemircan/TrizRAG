@@ -1,17 +1,20 @@
 import streamlit as st
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-import openai
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import hashlib
 import time
-import json
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict
 import requests
 import os
 from datetime import datetime
 from dotenv import load_dotenv
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import pandasai as pai
+from pandasai_litellm.litellm import LiteLLM
 
 
 # .env dosyasını yükle
@@ -471,6 +474,169 @@ YANIT: Yukarıdaki kaynaklardaki bilgileri kullanarak soruyu detaylı bir şekil
         except Exception as e:
             return {"error": str(e)}
 
+    def analyze_data_with_pandasai(self, df: pd.DataFrame, query: str) -> Dict:
+        """PandasAI ile veri analizi yap"""
+        try:
+            openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+            if not openrouter_api_key:
+                return {
+                    "success": False,
+                    "error": "OpenRouter API key bulunamadı. Lütfen .env dosyasında OPENROUTER_API_KEY'i ayarlayın."
+                }
+
+            # OpenRouter API key'i environment variable olarak ayarla
+            os.environ["OPENROUTER_API_KEY"] = openrouter_api_key
+            
+            # LiteLLM ile LLM oluştur
+            llm = LiteLLM(model="openrouter/mistralai/mistral-small-3.1-24b-instruct:free")
+            
+            # pandasai konfigürasyonu
+            pai.config.set({
+                "llm": llm
+            })
+
+            # pandas DataFrame'i pandasai DataFrame'e çevir
+            pai_df = pai.DataFrame(df)
+
+            # Veri analizi yap - pai.chat kullan
+            with st.spinner("🤖 AI analyzing your data..."):
+                response = pai_df.chat(query)
+
+            return {
+                "success": True,    
+                "response": response,
+                "dataframe_info": {
+                    "shape": df.shape,
+                    "columns": df.columns.tolist(),
+                    "dtypes": df.dtypes.to_dict(),
+                    "missing_values": df.isnull().sum().to_dict()
+                }
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Veri analizi hatası: {str(e)}"
+            }
+
+    def create_visualization(self, df: pd.DataFrame, chart_type: str, x_col: str, y_col: str, 
+                           title: str = "", color_col: str = None) -> go.Figure:
+        """Veri görselleştirme oluştur"""
+        try:
+            if chart_type == "bar":
+                fig = px.bar(df, x=x_col, y=y_col, title=title, color=color_col)
+            elif chart_type == "line":
+                fig = px.line(df, x=x_col, y=y_col, title=title, color=color_col)
+            elif chart_type == "scatter":
+                fig = px.scatter(df, x=x_col, y=y_col, title=title, color=color_col)
+            elif chart_type == "histogram":
+                fig = px.histogram(df, x=x_col, title=title, color=color_col)
+            elif chart_type == "box":
+                fig = px.box(df, x=x_col, y=y_col, title=title, color=color_col)
+            elif chart_type == "pie":
+                fig = px.pie(df, values=y_col, names=x_col, title=title)
+            else:
+                fig = px.bar(df, x=x_col, y=y_col, title=title)
+
+            fig.update_layout(
+                template="plotly_white",
+                title_x=0.5,
+                height=500
+            )
+            return fig
+
+        except Exception as e:
+            st.error(f"Görselleştirme hatası: {e}")
+            return None
+
+    def get_data_summary(self, df: pd.DataFrame) -> Dict:
+        """Veri özeti oluştur"""
+        try:
+            summary = {
+                "shape": df.shape,
+                "columns": df.columns.tolist(),
+                "dtypes": df.dtypes.to_dict(),
+                "missing_values": df.isnull().sum().to_dict(),
+                "numeric_columns": df.select_dtypes(include=[np.number]).columns.tolist(),
+                "categorical_columns": df.select_dtypes(include=['object']).columns.tolist(),
+                "memory_usage": df.memory_usage(deep=True).sum() / 1024 / 1024  # MB
+            }
+
+            # Sayısal sütunlar için istatistikler
+            if summary["numeric_columns"]:
+                summary["numeric_stats"] = df[summary["numeric_columns"]].describe().to_dict()
+
+            # Kategorik sütunlar için unique değer sayıları
+            if summary["categorical_columns"]:
+                summary["categorical_stats"] = {
+                    col: df[col].nunique() for col in summary["categorical_columns"]
+                }
+
+            return summary
+
+        except Exception as e:
+            return {"error": f"Özet oluşturma hatası: {str(e)}"}
+
+    def suggest_visualizations(self, df: pd.DataFrame) -> List[Dict]:
+        """Veri tipine göre görselleştirme önerileri"""
+        suggestions = []
+        
+        try:
+            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
+            
+            # Sayısal sütunlar için öneriler
+            if len(numeric_cols) >= 2:
+                suggestions.append({
+                    "type": "scatter",
+                    "title": f"{numeric_cols[0]} vs {numeric_cols[1]} İlişkisi",
+                    "x_col": numeric_cols[0],
+                    "y_col": numeric_cols[1],
+                    "description": "İki sayısal değişken arasındaki ilişkiyi gösterir"
+                })
+                
+                suggestions.append({
+                    "type": "line",
+                    "title": f"{numeric_cols[0]} Trendi",
+                    "x_col": df.index.name if df.index.name else "Index",
+                    "y_col": numeric_cols[0],
+                    "description": "Zaman serisi analizi için uygun"
+                })
+            
+            # Kategorik sütunlar için öneriler
+            if categorical_cols and numeric_cols:
+                suggestions.append({
+                    "type": "bar",
+                    "title": f"{categorical_cols[0]} Kategorilerine Göre {numeric_cols[0]}",
+                    "x_col": categorical_cols[0],
+                    "y_col": numeric_cols[0],
+                    "description": "Kategorik değişkenlere göre sayısal değerlerin karşılaştırması"
+                })
+            
+            # Histogram önerileri
+            if numeric_cols:
+                suggestions.append({
+                    "type": "histogram",
+                    "title": f"{numeric_cols[0]} Dağılımı",
+                    "x_col": numeric_cols[0],
+                    "description": "Sayısal değişkenin dağılımını gösterir"
+                })
+            
+            # Box plot önerileri
+            if len(numeric_cols) >= 1 and len(categorical_cols) >= 1:
+                suggestions.append({
+                    "type": "box",
+                    "title": f"{categorical_cols[0]} Kategorilerine Göre {numeric_cols[0]} Dağılımı",
+                    "x_col": categorical_cols[0],
+                    "y_col": numeric_cols[0],
+                    "description": "Kategorilere göre sayısal değişkenin dağılımını gösterir"
+                })
+                
+        except Exception as e:
+            st.error(f"Öneri oluşturma hatası: {e}")
+            
+        return suggestions
+
 
 # Ana uygulama
 def main():
@@ -776,6 +942,267 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
                     else:
                         st.warning("⚠️ No relevant information found. Try lowering the similarity threshold.")
 
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Tab 2: Data Analytics
+    with tab2:
+        st.markdown('<div class="tab-content">', unsafe_allow_html=True)
+        
+        # Help tooltip
+        st.markdown("""
+        <div class="help-tooltip">
+            <strong>💡 Data Analytics:</strong> Upload CSV/Excel files and use natural language to analyze your data. 
+            AI will help you understand patterns, create visualizations, and generate insights.
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Session state'de veri saklama
+        if "uploaded_data" not in st.session_state:
+            st.session_state.uploaded_data = None
+        if "data_analysis_history" not in st.session_state:
+            st.session_state.data_analysis_history = []
+        
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            st.header("📁 Data Upload")
+            
+            # Modern upload area
+            st.markdown("""
+            <div class="upload-area">
+                <h4>📊 Upload Data Files</h4>
+                <p>Drag & drop or click to upload CSV, Excel files</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Dosya yükleme
+            uploaded_data_files = st.file_uploader(
+                "Choose data files:",
+                type=['csv', 'xlsx', 'xls'],
+                accept_multiple_files=False,
+                key="data_uploader"
+            )
+            
+            # Örnek veri oluşturma
+            st.subheader("🎲 Sample Data Generator")
+            if st.button("📊 Generate Sample Dataset", use_container_width=True):
+                # Örnek satış verisi oluştur
+                np.random.seed(42)
+                dates = pd.date_range('2024-01-01', periods=100, freq='D')
+                categories = ['Electronics', 'Clothing', 'Books', 'Home', 'Sports']
+                
+                sample_data = pd.DataFrame({
+                    'Date': dates,
+                    'Category': np.random.choice(categories, 100),
+                    'Sales_Amount': np.random.normal(1000, 300, 100),
+                    'Units_Sold': np.random.poisson(50, 100),
+                    'Customer_Rating': np.random.uniform(1, 5, 100).round(1),
+                    'Region': np.random.choice(['North', 'South', 'East', 'West'], 100)
+                })
+                
+                st.session_state.uploaded_data = sample_data
+                st.success("✅ Sample dataset generated successfully!")
+                st.rerun()
+            
+            # Veri yükleme işlemi
+            if uploaded_data_files:
+                try:
+                    if uploaded_data_files.name.endswith('.csv'):
+                        df = pd.read_csv(uploaded_data_files)
+                    else:
+                        df = pd.read_excel(uploaded_data_files)
+                    
+                    st.session_state.uploaded_data = df
+                    st.success(f"✅ Data loaded successfully! Shape: {df.shape}")
+                    
+                except Exception as e:
+                    st.error(f"❌ Error loading data: {e}")
+            
+            # Yüklenen veri özeti
+            if st.session_state.uploaded_data is not None:
+                df = st.session_state.uploaded_data
+                st.subheader("📋 Data Overview")
+                
+                # Veri özeti
+                summary = rag_system.get_data_summary(df)
+                if "error" not in summary:
+                    col1_metric, col2_metric, col3_metric = st.columns(3)
+                    
+                    with col1_metric:
+                        st.metric("Rows", summary["shape"][0])
+                    with col2_metric:
+                        st.metric("Columns", summary["shape"][1])
+                    with col3_metric:
+                        st.metric("Memory (MB)", f"{summary['memory_usage']:.2f}")
+                    
+                    # Veri önizleme
+                    with st.expander("👀 Preview Data"):
+                        st.dataframe(df.head(10), use_container_width=True)
+                    
+                    # Veri tipleri
+                    with st.expander("🔍 Data Types & Missing Values"):
+                        col1_type, col2_missing = st.columns(2)
+                        
+                        with col1_type:
+                            st.write("**Data Types:**")
+                            for col, dtype in summary["dtypes"].items():
+                                st.write(f"• {col}: {dtype}")
+                        
+                        with col2_missing:
+                            st.write("**Missing Values:**")
+                            for col, missing in summary["missing_values"].items():
+                                if missing > 0:
+                                    st.write(f"• {col}: {missing}")
+                                else:
+                                    st.write(f"• {col}: ✅ Complete")
+        
+        with col2:
+            st.header("🤖 AI-Powered Analysis")
+            
+            if st.session_state.uploaded_data is not None:
+                df = st.session_state.uploaded_data
+                
+                # Doğal dil ile analiz
+                st.subheader("💬 Ask Questions About Your Data")
+                
+                # Örnek sorular
+                example_questions = [
+                    "Bu veri setinde kaç satır var?",
+                    "En yüksek satış miktarı nedir?",
+                    "Kategorilere göre ortalama satış miktarını göster",
+                    "Bölgelere göre müşteri puanlarını karşılaştır",
+                    "Satış miktarı ile müşteri puanı arasında korelasyon var mı?"
+                ]
+                
+                # Örnek soru seçimi
+                selected_example = st.selectbox(
+                    "💡 Example Questions:",
+                    ["Custom Question"] + example_questions,
+                    help="Choose an example question or write your own"
+                )
+                
+                if selected_example != "Custom Question":
+                    analysis_query = selected_example
+                else:
+                    analysis_query = st.text_input(
+                        "Your analysis question:",
+                        placeholder="Example: What is the average sales amount by category?",
+                        key="analysis_query"
+                    )
+                
+                if st.button("🔍 Analyze with AI", type="primary", use_container_width=True) and analysis_query:
+                    #  PI key kontrolü
+                    if not os.getenv("OPENROUTER_API_KEY"):
+                        st.error("❌API key bulunamadı. Lütfen .env dosyasında OPENROUTER_API_KEY'i ayarlayın.")
+                    else:
+                        # AI analizi yap
+                        analysis_result = rag_system.analyze_data_with_pandasai(df, analysis_query)
+                        
+                        if analysis_result["success"]:
+                            # Sonucu göster
+                            st.subheader("🎯 AI Analysis Result")
+                            st.markdown(f"""
+                            <div class="success-message">
+                                {analysis_result["response"]}
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Analiz geçmişine ekle
+                            st.session_state.data_analysis_history.append({
+                                "query": analysis_query,
+                                "response": analysis_result["response"],
+                                "timestamp": datetime.now().strftime("%H:%M:%S")
+                            })
+                            
+                        else:
+                            st.error(f"❌ Analysis failed: {analysis_result['error']}")
+                
+                # Görselleştirme önerileri
+                st.subheader("📊 Visualization Suggestions")
+                suggestions = rag_system.suggest_visualizations(df)
+                
+                if suggestions:
+                    for i, suggestion in enumerate(suggestions[:3]):  # İlk 3 öneriyi göster
+                        with st.expander(f"💡 {suggestion['title']}"):
+                            st.write(suggestion['description'])
+                            
+                            if st.button(f"Create {suggestion['type'].title()} Chart", key=f"create_{i}"):
+                                fig = rag_system.create_visualization(
+                                    df, suggestion['type'], suggestion['x_col'], 
+                                    suggestion.get('y_col', ''), suggestion['title']
+                                )
+                                if fig:
+                                    st.session_state.current_chart = fig
+            
+            else:
+                st.info("📁 Please upload a data file or generate sample data to start analysis.")
+        
+        # Alt kısım - Gelişmiş görselleştirme
+        if st.session_state.uploaded_data is not None:
+            st.markdown("---")
+            st.header("🎨 Advanced Visualization")
+            
+            df = st.session_state.uploaded_data
+            
+            col1_viz, col2_viz = st.columns(2)
+            
+            with col1_viz:
+                st.subheader("📈 Chart Configuration")
+                
+                # Grafik tipi seçimi
+                chart_types = {
+                    "Bar Chart": "bar",
+                    "Line Chart": "line", 
+                    "Scatter Plot": "scatter",
+                    "Histogram": "histogram",
+                    "Box Plot": "box",
+                    "Pie Chart": "pie"
+                }
+                
+                selected_chart = st.selectbox("Chart Type:", list(chart_types.keys()))
+                chart_type = chart_types[selected_chart]
+                
+                # Sütun seçimi
+                available_columns = df.columns.tolist()
+                
+                if chart_type in ["pie"]:
+                    x_col = st.selectbox("Values Column:", available_columns)
+                    y_col = None
+                else:
+                    x_col = st.selectbox("X-Axis Column:", available_columns)
+                    y_col = st.selectbox("Y-Axis Column:", available_columns) if chart_type != "histogram" else None
+                
+                # Renk sütunu (opsiyonel)
+                color_col = st.selectbox("Color Column (Optional):", ["None"] + available_columns)
+                color_col = None if color_col == "None" else color_col
+                
+                # Başlık
+                chart_title = st.text_input("Chart Title:", value=f"{selected_chart} of {x_col}")
+                
+                if st.button("🎨 Create Chart", type="primary"):
+                    fig = rag_system.create_visualization(
+                        df, chart_type, x_col, y_col, chart_title, color_col
+                    )
+                    if fig:
+                        st.session_state.current_chart = fig
+            
+            with col2_viz:
+                st.subheader("📊 Chart Display")
+                
+                if "current_chart" in st.session_state:
+                    st.plotly_chart(st.session_state.current_chart, use_container_width=True)
+                    
+                    # Grafik indirme
+                    chart_bytes = st.session_state.current_chart.to_image(format="png")
+                    st.download_button(
+                        label="📥 Download Chart as PNG",
+                        data=chart_bytes,
+                        file_name=f"chart_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+                        mime="image/png"
+                    )
+                else:
+                    st.info("🎨 Configure and create a chart to display it here.")
+        
         st.markdown('</div>', unsafe_allow_html=True)
 
     # Alt bilgi

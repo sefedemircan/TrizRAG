@@ -35,3 +35,110 @@ df_result = execute_sql_query(sql_query)
 average_age = df_result.iloc[0]['average_age']
 result = {'type': 'number', 'value': average_age}
 2025-08-17 21:37:59 [INFO] Response generated successfully.
+2025-09-01 15:59:18 [INFO] Running PandasAI with litellm LLM...
+2025-09-01 15:59:18 [INFO] Prompt ID: ee8a26ee-eafa-4699-8210-6b0eb12fb6ec
+2025-09-01 15:59:18 [INFO] Generating new code...
+2025-09-01 15:59:23 [INFO] Code Generated:
+# TODO: import the required dependencies
+import pandas as pd
+
+# Execute SQL query to calculate the average age
+query = """
+SELECT AVG(age) AS avg_age
+FROM table_b1e4208fe0533aa2e90ed8f9805143ad;
+"""
+
+# This is a mock-up of the needed process
+result_df = execute_sql_query(query)
+
+# Extract the result from the dataFrame (assuming there is only one record as a result)
+avg_age = result_df['avg_age'].values[0]
+
+# Declare result var:
+result = { "type": "string", "value": f"The average age is {avg_age}." }
+2025-09-01 15:59:23 [INFO] Validating code requirements...
+2025-09-01 15:59:23 [INFO] Code validation successful.
+2025-09-01 15:59:23 [INFO] Cleaning the generated code...
+2025-09-01 15:59:23 [INFO] Executing code: import pandas as pd
+query = """
+SELECT AVG(age) AS avg_age
+FROM table_b1e4208fe0533aa2e90ed8f9805143ad;
+"""
+result_df = execute_sql_query(query)
+avg_age = result_df['avg_age'].values[0]
+result = {'type': 'string', 'value': f'The average age is {avg_age}.'}
+2025-09-01 15:59:25 [INFO] Response generated successfully.
+2025-09-01 17:39:29 [INFO] Ignored error after process had died: OSError(9, 'The handle is invalid', None, 6, None)
+2025-09-01 17:39:29 [INFO] Ignored error after process had died: OSError(9, 'The handle is invalid', None, 6, None)
+2025-09-01 17:44:22 [INFO] Running PandasAI with litellm LLM...
+2025-09-01 17:44:22 [INFO] Prompt ID: 36ee8807-3e62-428b-9636-e5faf8f5154b
+2025-09-01 17:44:22 [INFO] Generating new code...
+2025-09-01 17:44:34 [INFO] Code Generated:
+# import the required dependencies
+import pandas as pd
+
+# SQL query to calculate the average age from the provided table
+sql_query = """
+    SELECT AVG(age) as avg_age
+    FROM table_b1e4208fe0533aa2e90ed8f9805143ad
+"""
+
+# Execute the SQL query and store the result in a DataFrame
+df_avg_age = execute_sql_query(sql_query)
+
+# Extract the average age from the DataFrame
+avg_age = df_avg_age.iloc[0]['avg_age']
+
+# Declare result var:
+result = {
+    "type": "number",
+    "value": avg_age
+}
+
+# Output the result
+print(result)
+2025-09-01 17:44:34 [INFO] Validating code requirements...
+2025-09-01 17:44:34 [INFO] Code validation successful.
+2025-09-01 17:44:34 [INFO] Cleaning the generated code...
+2025-09-01 17:44:34 [INFO] Executing code: import pandas as pd
+sql_query = """
+    SELECT AVG(age) as avg_age
+    FROM table_b1e4208fe0533aa2e90ed8f9805143ad
+"""
+df_avg_age = execute_sql_query(sql_query)
+avg_age = df_avg_age.iloc[0]['avg_age']
+result = {'type': 'number', 'value': avg_age}
+print(result)
+2025-09-01 17:44:34 [INFO] Response generated successfully.
+2025-09-01 17:45:40 [INFO] Chromium init'ed with kwargs {}
+2025-09-01 17:45:40 [INFO] Found chromium path: C:\Program Files\Google\Chrome\Application\chrome.exe
+2025-09-01 17:45:40 [INFO] Temp directory created: C:\Users\sefed\AppData\Local\Temp\tmpcrphctma.
+2025-09-01 17:45:40 [INFO] Opening browser.
+2025-09-01 17:45:40 [INFO] Temp directory created: C:\Users\sefed\AppData\Local\Temp\tmp984f5v1y.
+2025-09-01 17:45:40 [INFO] Temporary directory at: C:\Users\sefed\AppData\Local\Temp\tmp984f5v1y
+2025-09-01 17:45:41 [INFO] Conforming 1 to file:///C:/Users/sefed/AppData/Local/Temp/tmpcrphctma/index.html
+2025-09-01 17:45:41 [INFO] Waiting on all navigates
+2025-09-01 17:45:42 [INFO] All navigates done, putting them all in queue.
+2025-09-01 17:45:42 [INFO] Getting tab from queue (has 1)
+2025-09-01 17:45:42 [INFO] Got BE91
+2025-09-01 17:45:42 [INFO] Processing Bar_Chart_of_age.png
+2025-09-01 17:45:42 [INFO] Sending big command for Bar_Chart_of_age.png.
+2025-09-01 17:45:43 [INFO] Sent big command for Bar_Chart_of_age.png.
+2025-09-01 17:45:43 [INFO] Reloading tab BE91 before return.
+2025-09-01 17:45:43 [INFO] Putting tab BE91 back (queue size: 0).
+2025-09-01 17:45:43 [INFO] Waiting for all cleanups to finish.
+2025-09-01 17:45:43 [INFO] Exiting Kaleido
+2025-09-01 17:45:43 [INFO] TemporaryDirectory.cleanup() worked.
+2025-09-01 17:45:43 [INFO] shutil.rmtree worked.
+2025-09-01 17:45:43 [INFO] Cancelling tasks.
+2025-09-01 17:45:43 [INFO] Exiting Kaleido/Choreo
+2025-09-01 17:45:43 [INFO] Closing browser.
+2025-09-01 17:45:43 [INFO] TemporaryDirectory.cleanup() worked.
+2025-09-01 17:45:43 [INFO] shutil.rmtree worked.
+2025-09-01 17:45:43 [INFO] Cancelling tasks.
+2025-09-01 17:45:43 [INFO] Exiting Kaleido/Choreo
+2025-09-01 17:45:43 [INFO] Closing browser.
+2025-09-01 17:45:44 [INFO] TemporaryDirectory.cleanup() worked.
+2025-09-01 17:45:44 [INFO] shutil.rmtree worked.
+2025-09-01 17:45:44 [INFO] TemporaryDirectory.cleanup() worked.
+2025-09-01 17:45:44 [INFO] shutil.rmtree worked.
