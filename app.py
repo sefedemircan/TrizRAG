@@ -1,20 +1,13 @@
 import streamlit as st
-import chromadb
-from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-from sentence_transformers import SentenceTransformer
 import numpy as np
-import hashlib
 import time
-from typing import List, Dict
-import requests
 import os
 from datetime import datetime
 from dotenv import load_dotenv
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import pandasai as pai
-from pandasai_litellm.litellm import LiteLLM
+from tools import RagTool, AnalyticsTool, Neo4jTool
 
 
 # .env dosyasını yükle
@@ -139,505 +132,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-
-class AdvancedRAGSystem:
-    def __init__(self):
-        self.embedding_model = None
-        self.client = None
-        self.collection = None
-        self.collection_name = "rag-poc-collection"
-        # OpenRouter API key'i .env'den otomatik al
-        self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-        self.dimension = 1024  # all-MiniLM-L6-v2 embedding boyutu
-        self.chroma_api_key = os.getenv("CHROMA_API_KEY")
-        self.chroma_tenant = os.getenv("CHROMA_TENANT")
-        self.chroma_database = os.getenv("CHROMA_DATABASE")
-        
-
-    def initialize_chromadb(self):
-        """ChromaDB Cloud'u başlat"""
-        try:
-            # ChromaDB Cloud client'ı başlat
-            self.client = chromadb.HttpClient(
-                ssl=True,
-                host='api.trychroma.com',
-                tenant=self.chroma_tenant,
-                database=self.chroma_database,
-                headers={
-                    'x-chroma-token': self.chroma_api_key
-                }
-            )
-            
-            # Embedding function oluştur
-            embedding_function = SentenceTransformerEmbeddingFunction(
-                model_name='intfloat/multilingual-e5-large'
-            )
-            
-            # Collection'ı oluştur veya al
-            try:
-                self.collection = self.client.get_collection(
-                    name=self.collection_name,
-                    embedding_function=embedding_function
-                )
-            except:
-                self.collection = self.client.create_collection(
-                    name=self.collection_name,
-                    embedding_function=embedding_function
-                )
-            
-            return True
-
-        except Exception as e:
-            st.error(f"ChromaDB Cloud bağlantı hatası: {e}")
-            return False
-
-    
-
-    @st.cache_resource
-    def load_embedding_model(_self):
-        """Embedding modelini yükle"""
-        try:
-            _self.embedding_model = SentenceTransformer('intfloat/multilingual-e5-large')
-            return True
-        except Exception as e:
-            st.error(f"Embedding model yükleme hatası: {e}")
-            return False
-
-    def chunk_text(self, text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]:
-        """Metni parçalara böl"""
-        chunks = []
-        start = 0
-        text_length = len(text)
-
-        while start < text_length:
-            end = start + chunk_size
-            if end > text_length:
-                end = text_length
-
-            chunk = text[start:end]
-            chunks.append(chunk.strip())
-
-            if end == text_length:
-                break
-
-            start = end - overlap
-
-        return [chunk for chunk in chunks if len(chunk.strip()) > 10]
-
-    def generate_id(self, text: str) -> str:
-        """Metin için benzersiz ID üret"""
-        return hashlib.md5(text.encode()).hexdigest()
-
-    def upsert_documents(self, documents: List[str], metadata_list: List[Dict] = None) -> bool:
-        """Dökümanları ChromaDB'ye ekle"""
-        if not self.collection:
-            return False
-
-        try:
-            all_ids = []
-            all_documents = []
-            all_metadatas = []
-
-            with st.spinner("Dökümanlar işleniyor ve vektörleştiriliyor..."):
-                for i, doc in enumerate(documents):
-                    # Metni parçalara böl
-                    chunks = self.chunk_text(doc)
-
-                    for j, chunk in enumerate(chunks):
-                        # ID oluştur
-                        chunk_id = f"doc_{i}_chunk_{j}_{self.generate_id(chunk)[:8]}"
-
-                        # Metadata hazırla
-                        metadata = {
-                            "doc_id": i,
-                            "chunk_id": j,
-                            "timestamp": datetime.now().isoformat(),
-                            "length": len(chunk)
-                        }
-
-                        if metadata_list and i < len(metadata_list):
-                            metadata.update(metadata_list[i])
-
-                        all_ids.append(chunk_id)
-                        all_documents.append(chunk)
-                        all_metadatas.append(metadata)
-
-            # ChromaDB'ye ekle
-            self.collection.add(
-                ids=all_ids,
-                documents=all_documents,
-                metadatas=all_metadatas
-            )
-
-            return True
-
-        except Exception as e:
-            st.error(f"Döküman ekleme hatası: {e}")
-            return False
-
-    def search_similar(self, query: str, top_k: int = 5, score_threshold: float = 0.5, search_type: str = "semantic") -> List[Dict]:
-        """Benzer dökümanları ara"""
-        if not self.collection:
-            return []
-
-        try:
-            if search_type == "semantic":
-                # Semantic search - embedding tabanlı
-                results = self.collection.query(
-                    query_texts=[query],
-                    n_results=top_k,
-                    include=["documents", "metadatas", "distances"]
-                )
-            elif search_type == "keyword":
-                # Keyword search - where clause ile
-                results = self.collection.query(
-                    query_texts=[query],
-                    n_results=top_k,
-                    where={"$or": [{"text": {"$contains": word}} for word in query.lower().split() if len(word) > 2]},
-                    include=["documents", "metadatas", "distances"]
-                )
-            elif search_type == "hybrid":
-                # Hybrid search - hem semantic hem keyword
-                semantic_results = self.collection.query(
-                    query_texts=[query],
-                    n_results=top_k * 2,  # Daha fazla sonuç al
-                    include=["documents", "metadatas", "distances"]
-                )
-                
-                keyword_results = self.collection.query(
-                    query_texts=[query],
-                    n_results=top_k * 2,
-                    where={"$or": [{"text": {"$contains": word}} for word in query.lower().split() if len(word) > 2]},
-                    include=["documents", "metadatas", "distances"]
-                )
-                
-                # Sonuçları birleştir ve sırala
-                all_results = []
-                
-                # Semantic sonuçları ekle
-                if semantic_results['documents'] and semantic_results['documents'][0]:
-                    for i, (doc, metadata, distance) in enumerate(zip(
-                        semantic_results['documents'][0], 
-                        semantic_results['metadatas'][0], 
-                        semantic_results['distances'][0]
-                    )):
-                        similarity_score = max(0.0, 1 - distance)
-                        all_results.append({
-                            "text": doc,
-                            "score": similarity_score * 0.5,  # Semantic ağırlığı
-                            "metadata": metadata,
-                            "search_type": "semantic"
-                        })
-                
-                # Keyword sonuçları ekle
-                if keyword_results['documents'] and keyword_results['documents'][0]:
-                    for i, (doc, metadata, distance) in enumerate(zip(
-                        keyword_results['documents'][0], 
-                        keyword_results['metadatas'][0], 
-                        keyword_results['distances'][0]
-                    )):
-                        similarity_score = 1 - distance
-                        all_results.append({
-                            "text": doc,
-                            "score": similarity_score * 0.3,  # Keyword ağırlığı
-                            "metadata": metadata,
-                            "search_type": "keyword"
-                        })
-                
-                # Tekrar eden sonuçları birleştir ve sırala
-                unique_results = {}
-                for result in all_results:
-                    text_key = result['text'][:100]  # İlk 100 karakteri key olarak kullan
-                    if text_key not in unique_results:
-                        unique_results[text_key] = result
-                    else:
-                        # Daha yüksek skoru al
-                        if result['score'] > unique_results[text_key]['score']:
-                            unique_results[text_key] = result
-                
-                # Skora göre sırala ve top_k kadar al
-                sorted_results = sorted(unique_results.values(), key=lambda x: x['score'], reverse=True)
-                return [r for r in sorted_results[:top_k] if r['score'] >= score_threshold]
-            else:
-                # Default semantic search
-                results = self.collection.query(
-                    query_texts=[query],
-                    n_results=top_k,
-                    include=["documents", "metadatas", "distances"]
-                )
-
-            # Sonuçları filtrele ve düzenle
-            filtered_results = []
-            if results['documents'] and results['documents'][0]:
-                for i, (doc, metadata, distance) in enumerate(zip(
-                    results['documents'][0], 
-                    results['metadatas'][0], 
-                    results['distances'][0]
-                )):
-                    # Distance'ı similarity score'a çevir (ChromaDB cosine distance kullanır)
-                    similarity_score = 1 - distance  # Cosine distance'ı similarity'e çevir
-                    
-                    if similarity_score >= score_threshold:
-                        filtered_results.append({
-                            "text": doc,
-                            "score": similarity_score,
-                            "metadata": metadata,
-                            "search_type": search_type
-                        })
-
-            return filtered_results
-
-        except Exception as e:
-            st.error(f"Arama hatası: {e}")
-            return []
-
-    def call_openrouter_llm(self, prompt: str, model: str = "microsoft/wizardlm-2-8x22b") -> str:
-        """OpenRouter API ile LLM çağrısı"""
-        if not self.openrouter_api_key:
-            return "❌ OpenRouter API key bulunamadı. Lütfen .env dosyasında OPENROUTER_API_KEY'i ayarlayın."
-
-        try:
-            headers = {
-                "Authorization": f"Bearer {self.openrouter_api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://streamlit.io",
-                "X-Title": "RAG PoC System"
-            }
-
-            data = {
-                "model": model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "Sen yardımcı bir asistansın. Verilen bilgileri kullanarak doğru, detaylı ve Türkçe yanıtlar ver."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "max_tokens": 500,
-                "temperature": 0.7
-            }
-
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers=headers,
-                json=data,
-                timeout=30
-            )
-
-            if response.status_code == 200:
-                result = response.json()
-                return result["choices"][0]["message"]["content"]
-            else:
-                return f"❌ API Hatası: {response.status_code} - {response.text}"
-
-        except Exception as e:
-            return f"❌ LLM çağrı hatası: {e}"
-
-    def generate_rag_response(self, query: str, search_results: List[Dict], model: str) -> str:
-        """RAG ile yanıt üret"""
-        if not search_results:
-            return "İlgili bilgi bulunamadı."
-
-        # Context oluştur
-        context_parts = []
-        for i, result in enumerate(search_results, 1):
-            context_parts.append(f"Kaynak {i}: {result['text']}")
-
-        context = "\n\n".join(context_parts)
-
-        # Prompt oluştur
-        prompt = f"""Aşağıdaki kaynaklardaki bilgileri kullanarak soruyu yanıtla:
-
-KAYNAKLAR:
-{context}
-
-SORU: {query}
-
-YANIT: Yukarıdaki kaynaklardaki bilgileri kullanarak soruyu detaylı bir şekilde yanıtla. Hangi kaynakları kullandığını belirt."""
-
-        return self.call_openrouter_llm(prompt, model)
-
-    def get_collection_stats(self) -> Dict:
-        """Collection istatistiklerini al"""
-        if not self.collection:
-            return {}
-
-        try:
-            count = self.collection.count()
-            return {
-                "total_documents": count,
-                "collection_name": self.collection_name
-            }
-        except Exception as e:
-            return {"error": str(e)}
-
-    def analyze_data_with_pandasai(self, df: pd.DataFrame, query: str) -> Dict:
-        """PandasAI ile veri analizi yap"""
-        try:
-            openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-            if not openrouter_api_key:
-                return {
-                    "success": False,
-                    "error": "OpenRouter API key bulunamadı. Lütfen .env dosyasında OPENROUTER_API_KEY'i ayarlayın."
-                }
-
-            # OpenRouter API key'i environment variable olarak ayarla
-            os.environ["OPENROUTER_API_KEY"] = openrouter_api_key
-            
-            # LiteLLM ile LLM oluştur
-            llm = LiteLLM(model="openrouter/mistralai/mistral-small-3.1-24b-instruct:free")
-            
-            # pandasai konfigürasyonu
-            pai.config.set({
-                "llm": llm
-            })
-
-            # pandas DataFrame'i pandasai DataFrame'e çevir
-            pai_df = pai.DataFrame(df)
-
-            # Veri analizi yap - pai.chat kullan
-            with st.spinner("🤖 AI analyzing your data..."):
-                response = pai_df.chat(query)
-
-            return {
-                "success": True,    
-                "response": response,
-                "dataframe_info": {
-                    "shape": df.shape,
-                    "columns": df.columns.tolist(),
-                    "dtypes": df.dtypes.to_dict(),
-                    "missing_values": df.isnull().sum().to_dict()
-                }
-            }
-
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Veri analizi hatası: {str(e)}"
-            }
-
-    def create_visualization(self, df: pd.DataFrame, chart_type: str, x_col: str, y_col: str, 
-                           title: str = "", color_col: str = None) -> go.Figure:
-        """Veri görselleştirme oluştur"""
-        try:
-            if chart_type == "bar":
-                fig = px.bar(df, x=x_col, y=y_col, title=title, color=color_col)
-            elif chart_type == "line":
-                fig = px.line(df, x=x_col, y=y_col, title=title, color=color_col)
-            elif chart_type == "scatter":
-                fig = px.scatter(df, x=x_col, y=y_col, title=title, color=color_col)
-            elif chart_type == "histogram":
-                fig = px.histogram(df, x=x_col, title=title, color=color_col)
-            elif chart_type == "box":
-                fig = px.box(df, x=x_col, y=y_col, title=title, color=color_col)
-            elif chart_type == "pie":
-                fig = px.pie(df, values=y_col, names=x_col, title=title)
-            else:
-                fig = px.bar(df, x=x_col, y=y_col, title=title)
-
-            fig.update_layout(
-                template="plotly_white",
-                title_x=0.5,
-                height=500
-            )
-            return fig
-
-        except Exception as e:
-            st.error(f"Görselleştirme hatası: {e}")
-            return None
-
-    def get_data_summary(self, df: pd.DataFrame) -> Dict:
-        """Veri özeti oluştur"""
-        try:
-            summary = {
-                "shape": df.shape,
-                "columns": df.columns.tolist(),
-                "dtypes": df.dtypes.to_dict(),
-                "missing_values": df.isnull().sum().to_dict(),
-                "numeric_columns": df.select_dtypes(include=[np.number]).columns.tolist(),
-                "categorical_columns": df.select_dtypes(include=['object']).columns.tolist(),
-                "memory_usage": df.memory_usage(deep=True).sum() / 1024 / 1024  # MB
-            }
-
-            # Sayısal sütunlar için istatistikler
-            if summary["numeric_columns"]:
-                summary["numeric_stats"] = df[summary["numeric_columns"]].describe().to_dict()
-
-            # Kategorik sütunlar için unique değer sayıları
-            if summary["categorical_columns"]:
-                summary["categorical_stats"] = {
-                    col: df[col].nunique() for col in summary["categorical_columns"]
-                }
-
-            return summary
-
-        except Exception as e:
-            return {"error": f"Özet oluşturma hatası: {str(e)}"}
-
-    def suggest_visualizations(self, df: pd.DataFrame) -> List[Dict]:
-        """Veri tipine göre görselleştirme önerileri"""
-        suggestions = []
-        
-        try:
-            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-            categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
-            
-            # Sayısal sütunlar için öneriler
-            if len(numeric_cols) >= 2:
-                suggestions.append({
-                    "type": "scatter",
-                    "title": f"{numeric_cols[0]} vs {numeric_cols[1]} İlişkisi",
-                    "x_col": numeric_cols[0],
-                    "y_col": numeric_cols[1],
-                    "description": "İki sayısal değişken arasındaki ilişkiyi gösterir"
-                })
-                
-                suggestions.append({
-                    "type": "line",
-                    "title": f"{numeric_cols[0]} Trendi",
-                    "x_col": df.index.name if df.index.name else "Index",
-                    "y_col": numeric_cols[0],
-                    "description": "Zaman serisi analizi için uygun"
-                })
-            
-            # Kategorik sütunlar için öneriler
-            if categorical_cols and numeric_cols:
-                suggestions.append({
-                    "type": "bar",
-                    "title": f"{categorical_cols[0]} Kategorilerine Göre {numeric_cols[0]}",
-                    "x_col": categorical_cols[0],
-                    "y_col": numeric_cols[0],
-                    "description": "Kategorik değişkenlere göre sayısal değerlerin karşılaştırması"
-                })
-            
-            # Histogram önerileri
-            if numeric_cols:
-                suggestions.append({
-                    "type": "histogram",
-                    "title": f"{numeric_cols[0]} Dağılımı",
-                    "x_col": numeric_cols[0],
-                    "description": "Sayısal değişkenin dağılımını gösterir"
-                })
-            
-            # Box plot önerileri
-            if len(numeric_cols) >= 1 and len(categorical_cols) >= 1:
-                suggestions.append({
-                    "type": "box",
-                    "title": f"{categorical_cols[0]} Kategorilerine Göre {numeric_cols[0]} Dağılımı",
-                    "x_col": categorical_cols[0],
-                    "y_col": numeric_cols[0],
-                    "description": "Kategorilere göre sayısal değişkenin dağılımını gösterir"
-                })
-                
-        except Exception as e:
-            st.error(f"Öneri oluşturma hatası: {e}")
-            
-        return suggestions
-
-
 # Ana uygulama
 def main():
     # Modern Header
@@ -648,11 +142,17 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # RAG sistemi başlat
-    if "rag_system" not in st.session_state:
-        st.session_state.rag_system = AdvancedRAGSystem()
+    # Araçları başlat
+    if "rag_tool" not in st.session_state:
+        st.session_state.rag_tool = RagTool()
+    if "analytics_tool" not in st.session_state:
+        st.session_state.analytics_tool = AnalyticsTool()
+    if "neo4j_tool" not in st.session_state:
+        st.session_state.neo4j_tool = Neo4jTool()
 
-    rag_system = st.session_state.rag_system
+    rag_tool = st.session_state.rag_tool
+    analytics_tool = st.session_state.analytics_tool
+    neo4j_tool = st.session_state.neo4j_tool
 
     # Sidebar - Ayarlar
     with st.sidebar:
@@ -670,10 +170,8 @@ def main():
         st.header("⚙️ System Setup")
         if st.button("🔄 Initialize System", type="primary", use_container_width=True):
             with st.spinner("🚀 Initializing TrizRAG..."):
-                # Embedding model yükle
-                embedding_success = rag_system.load_embedding_model()
-                # ChromaDB başlat
-                chromadb_success = rag_system.initialize_chromadb()
+                embedding_success = rag_tool.load_embedding_model()
+                chromadb_success = rag_tool.initialize_chromadb()
                 
 
                 if embedding_success and chromadb_success:
@@ -723,18 +221,18 @@ def main():
         st.header("📊 System Status")
 
         # Bağlantı durumları
-        chromadb_status = "🟢 Connected" if rag_system.collection else "🔴 Disconnected"
+        chromadb_status = "🟢 Connected" if rag_tool.collection else "🔴 Disconnected"
         st.markdown(f"""
         <div style="display: flex; align-items: center; margin: 0.5rem 0;">
-            <span class="status-indicator {'status-connected' if rag_system.collection else 'status-disconnected'}"></span>
+            <span class="status-indicator {'status-connected' if rag_tool.collection else 'status-disconnected'}"></span>
             <span><strong>ChromaDB Cloud:</strong> {chromadb_status}</span>
         </div>
         """, unsafe_allow_html=True)
 
-        embedding_status = "🟢 Loaded" if rag_system.embedding_model else "🔴 Not Loaded"
+        embedding_status = "🟢 Loaded" if rag_tool.embedding_model else "🔴 Not Loaded"
         st.markdown(f"""
         <div style="display: flex; align-items: center; margin: 0.5rem 0;">
-            <span class="status-indicator {'status-connected' if rag_system.embedding_model else 'status-disconnected'}"></span>
+            <span class="status-indicator {'status-connected' if rag_tool.embedding_model else 'status-disconnected'}"></span>
             <span><strong>Embedding Model:</strong> {embedding_status}</span>
         </div>
         """, unsafe_allow_html=True)
@@ -745,8 +243,8 @@ def main():
 
 
         # Collection istatistikleri
-        if rag_system.collection:
-            stats = rag_system.get_collection_stats()
+        if rag_tool.collection:
+            stats = rag_tool.get_collection_stats()
             if "total_documents" in stats:
                 st.markdown(f"""
                 <div class="metric-card">
@@ -775,7 +273,7 @@ def main():
             """)
 
     # Ana içerik - Sekmeli yapı
-    tab1, tab2 = st.tabs(["📚 Document Intelligence", "📊 Data Analytics"])
+    tab1, tab2, tab3 = st.tabs(["📚 Document Intelligence", "📊 Data Analytics", "🕸️ Graph Chat (Neo4j)"])
     
     # Tab 1: Document Intelligence (RAG)
     with tab1:
@@ -833,7 +331,7 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
 
             # Döküman ekleme
             if st.button("📚 Add Documents", type="primary", use_container_width=True):
-                if not rag_system.collection:
+                if not rag_tool.collection:
                     st.warning("⚠️ Please initialize the system first!")
                 else:
                     documents = []
@@ -860,7 +358,7 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
                             })
 
                     if documents:
-                        success = rag_system.upsert_documents(documents, metadata_list)
+                        success = rag_tool.upsert_documents(documents, metadata_list)
                         if success:
                             st.success(f"✅ {len(documents)} documents successfully added!")
                             time.sleep(2)
@@ -881,14 +379,14 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
             )
 
             if st.button("🔍 Get Intelligent Answer", type="primary", use_container_width=True) and query:
-                if not rag_system.collection:
+                if not rag_tool.collection:
                     st.warning("⚠️ Please initialize the system first!")
-                elif not rag_system.openrouter_api_key:
+                elif not rag_tool.openrouter_api_key:
                     st.error("❌ OpenRouter API key not found! Please set OPENROUTER_API_KEY in .env file.")
                 else:
                     # Benzer dökümanları ara
                     with st.spinner(f"🔍 Searching for relevant information... ({search_type})"):
-                        search_results = rag_system.search_similar(
+                        search_results = rag_tool.search_similar(
                             query,
                             top_k=search_k,
                             score_threshold=score_threshold,
@@ -908,7 +406,7 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
                         
                         # RAG yanıtı üret
                         with st.spinner("🤖 Generating intelligent response..."):
-                            response = rag_system.generate_rag_response(
+                            response = rag_tool.generate_rag_response(
                                 query, search_results, selected_model
                             )
 
@@ -1024,7 +522,7 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
                 st.subheader("📋 Data Overview")
                 
                 # Veri özeti
-                summary = rag_system.get_data_summary(df)
+                summary = analytics_tool.get_data_summary(df)
                 if "error" not in summary:
                     col1_metric, col2_metric, col3_metric = st.columns(3)
                     
@@ -1096,7 +594,7 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
                         st.error("❌API key bulunamadı. Lütfen .env dosyasında OPENROUTER_API_KEY'i ayarlayın.")
                     else:
                         # AI analizi yap
-                        analysis_result = rag_system.analyze_data_with_pandasai(df, analysis_query)
+                        analysis_result = analytics_tool.analyze_data_with_pandasai(df, analysis_query)
                         
                         if analysis_result["success"]:
                             # Sonucu göster
@@ -1119,7 +617,7 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
                 
                 # Görselleştirme önerileri
                 st.subheader("📊 Visualization Suggestions")
-                suggestions = rag_system.suggest_visualizations(df)
+                suggestions = analytics_tool.suggest_visualizations(df)
                 
                 if suggestions:
                     for i, suggestion in enumerate(suggestions[:3]):  # İlk 3 öneriyi göster
@@ -1127,7 +625,7 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
                             st.write(suggestion['description'])
                             
                             if st.button(f"Create {suggestion['type'].title()} Chart", key=f"create_{i}"):
-                                fig = rag_system.create_visualization(
+                                fig = analytics_tool.create_visualization(
                                     df, suggestion['type'], suggestion['x_col'], 
                                     suggestion.get('y_col', ''), suggestion['title']
                                 )
@@ -1180,7 +678,7 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
                 chart_title = st.text_input("Chart Title:", value=f"{selected_chart} of {x_col}")
                 
                 if st.button("🎨 Create Chart", type="primary"):
-                    fig = rag_system.create_visualization(
+                    fig = analytics_tool.create_visualization(
                         df, chart_type, x_col, y_col, chart_title, color_col
                     )
                     if fig:
@@ -1203,6 +701,108 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
                 else:
                     st.info("🎨 Configure and create a chart to display it here.")
         
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Tab 3: Neo4j Graph Chat
+    with tab3:
+        st.markdown('<div class="tab-content">', unsafe_allow_html=True)
+        st.header("🕸️ Neo4j Graph Chat")
+        st.markdown("""
+        <div class="help-tooltip">
+            <strong>💡 Neo4j Graph Chat:</strong> Doğal dilde soru sorun, sistem soruyu Cypher'a çevirip graf üzerinde çalıştırır.
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Bağlantı ve şema
+        colA, colB = st.columns([1, 2])
+        with colA:
+            if st.button("🔌 Initialize Neo4j", use_container_width=True):
+                ok = neo4j_tool.initialize_neo4j()
+                if ok:
+                    st.success("✅ Neo4j connected!")
+                    st.rerun()
+                else:
+                    st.error("❌ Neo4j initialization failed!")
+
+            neo_status = "🟢 Connected" if neo4j_tool.neo4j_driver else "🔴 Disconnected"
+            st.markdown(f"**Connection:** {neo_status}")
+
+            if neo4j_tool.neo4j_driver:
+                schema = neo4j_tool.get_basic_schema()
+                with st.expander("📚 Basic Schema"):
+                    st.write("Labels:", schema.get("labels", []))
+                    st.write("Relationships:", schema.get("relationships", []))
+
+        with colB:
+            st.subheader("💬 Ask the Graph")
+            if "neo4j_messages" not in st.session_state:
+                st.session_state.neo4j_messages = []
+
+            user_q = st.text_input(
+                "Sorunuz:",
+                placeholder="Örn: En çok ilişkisi olan ilk 5 düğüm kimler?"
+            )
+
+            if st.button("🧠 Ask Graph", type="primary", use_container_width=True) and user_q:
+                if not neo4j_tool.neo4j_driver:
+                    st.warning("⚠️ Önce Neo4j bağlantısını başlatın.")
+                elif not neo4j_tool.openrouter_api_key:
+                    st.error("❌ OpenRouter API anahtarı bulunamadı.")
+                else:
+                    with st.spinner("🔧 Generating Cypher with AI..."):
+                        schema_hint = " , ".join((neo4j_tool.get_basic_schema().get("labels") or [])[:10])
+                        gen = neo4j_tool.llm_generate_cypher(user_q, schema_hint=schema_hint, model=selected_model)
+                    if not gen.get("success") or not gen.get("cypher"):
+                        st.error(f"Cypher üretim hatası: {gen.get('error', 'empty cypher')}")
+                    else:
+                        cypher = gen["cypher"]
+                        st.code(cypher, language="cypher")
+                        with st.spinner("🚀 Running Cypher on Neo4j..."):
+                            res = neo4j_tool.run_cypher(cypher)
+                        if not res.get("success"):
+                            st.error(f"Sorgu hatası: {res.get('error')}")
+                        else:
+                            records = res.get("records", [])
+                            st.success(f"✅ {len(records)} kayıt döndü")
+                            if records:
+                                try:
+                                    st.dataframe(pd.DataFrame(records))
+                                except Exception:
+                                    st.write(records)
+
+                            # LLM ile sonuçları özetle
+                            try:
+                                summary_prompt = (
+                                    "Aşağıdaki Cypher sonucu verilerini Türkçe kısa ve net bir şekilde özetle. "
+                                    "Gerekirse madde işaretleri kullan. İşte JSON veriler: "
+                                    f"{records[:50]}"
+                                )
+                                answer = neo4j_tool.call_openrouter_llm(summary_prompt, model=selected_model)
+                            except Exception as _:
+                                answer = ""
+
+                            st.subheader("🎯 AI Summary")
+                            st.markdown(f"""
+                            <div class="success-message">{answer}</div>
+                            """, unsafe_allow_html=True)
+
+                            # Sohbet geçmişi
+                            st.session_state.neo4j_messages.append({
+                                "question": user_q,
+                                "cypher": cypher,
+                                "answer": answer,
+                                "records_count": len(records),
+                                "time": datetime.now().strftime("%H:%M:%S")
+                            })
+
+            # Geçmiş
+            if st.session_state.neo4j_messages:
+                with st.expander(f"🕑 Conversation History ({len(st.session_state.neo4j_messages)})"):
+                    for i, m in enumerate(reversed(st.session_state.neo4j_messages), 1):
+                        st.write(f"{i}. {m['time']} — {m['question']}")
+                        st.code(m["cypher"], language="cypher")
+                        st.caption(f"Records: {m['records_count']}")
+
         st.markdown('</div>', unsafe_allow_html=True)
 
     # Alt bilgi

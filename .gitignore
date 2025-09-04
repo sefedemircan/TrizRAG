@@ -1,3 +1,5 @@
 .env
 .log
 .venv
+.pandasai.log
+__pycache__
