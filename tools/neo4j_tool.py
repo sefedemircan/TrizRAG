@@ -27,10 +27,100 @@ class Neo4jTool:
             if not (self.neo4j_uri and self.neo4j_username and self.neo4j_password):
                 st.error("Neo4j bilgileri eksik. Lütfen .env ayarlarını kontrol edin.")
                 return False
-            self.neo4j_driver = GraphDatabase.driver(self.neo4j_uri, auth=(self.neo4j_username, self.neo4j_password))
-            # Yalnızca verify_connectivity ile doğrulama
+            
+            # URI formatını kontrol et ve düzelt
+            uri = self.neo4j_uri.strip()
+            
+            # Çifte prefix kontrolü - eğer zaten neo4j+s:// varsa, ek prefix ekleme
+            if uri.startswith('neo4j+s://') and 'neo4j+s://' in uri[9:]:
+                # Çifte prefix varsa düzelt
+                uri = uri.replace('neo4j+s://neo4j+s://', 'neo4j+s://')
+                st.warning(f"⚠️ Çifte prefix düzeltildi: {uri}")
+            elif not uri.startswith(('neo4j://', 'neo4j+s://', 'bolt://', 'bolt+s://')):
+                st.warning("⚠️ Neo4j URI formatı düzeltiliyor...")
+                if 'databases.neo4j.io' in uri:
+                    uri = f"neo4j+s://{uri}"
+                else:
+                    uri = f"neo4j://{uri}"
+            
+            # Neo4j+s URI'si için özel ayarlar (dokümantasyona göre)
+            if uri.startswith('neo4j+s://'):
+                # neo4j+s URI'si için encryption ayarları kullanma
+                self.neo4j_driver = GraphDatabase.driver(
+                    uri, 
+                    auth=(self.neo4j_username, self.neo4j_password),
+                    max_connection_lifetime=30 * 60,  # 30 dakika
+                    max_connection_pool_size=50,
+                    connection_acquisition_timeout=2 * 60  # 2 dakika
+                )
+            else:
+                # Diğer URI'ler için encryption ayarları
+                self.neo4j_driver = GraphDatabase.driver(
+                    uri, 
+                    auth=(self.neo4j_username, self.neo4j_password),
+                    max_connection_lifetime=30 * 60,  # 30 dakika
+                    max_connection_pool_size=50,
+                    connection_acquisition_timeout=2 * 60,  # 2 dakika
+                    encrypted=True,
+                    trust="TRUST_SYSTEM_CA_SIGNED_CERTIFICATES"
+                )
+            
+            # Bağlantıyı test et
             self.neo4j_driver.verify_connectivity()
+            st.success(f"✅ Neo4j bağlantısı başarılı: {uri}")
             return True
+                
+        except Exception as conn_error:
+            st.error(f"Neo4j bağlantı hatası: {conn_error}")
+            
+            # Alternatif URI formatlarını dene
+            base_uri = self.neo4j_uri.strip()
+            if base_uri.startswith('neo4j+s://'):
+                base_uri = base_uri.replace('neo4j+s://', '')
+            
+            alternative_uris = [
+                f"neo4j+s://{base_uri}",
+                f"bolt+s://{base_uri}",
+                f"neo4j://{base_uri}",
+                f"bolt://{base_uri}"
+            ]
+            
+            for alt_uri in alternative_uris:
+                if alt_uri != uri:
+                    try:
+                        st.info(f"🔄 Alternatif URI deneniyor: {alt_uri}")
+                        
+                        # URI tipine göre ayarları belirle
+                        if alt_uri.startswith(('neo4j+s://', 'bolt+s://')):
+                            # SSL URI'leri için encryption ayarları kullanma
+                            temp_driver = GraphDatabase.driver(
+                                alt_uri, 
+                                auth=(self.neo4j_username, self.neo4j_password)
+                            )
+                        else:
+                            # Diğer URI'ler için encryption ayarları
+                            temp_driver = GraphDatabase.driver(
+                                alt_uri, 
+                                auth=(self.neo4j_username, self.neo4j_password),
+                                encrypted=True,
+                                trust="TRUST_SYSTEM_CA_SIGNED_CERTIFICATES"
+                            )
+                        
+                        temp_driver.verify_connectivity()
+                        self.neo4j_driver = temp_driver
+                        st.success(f"✅ Alternatif URI ile bağlantı başarılı: {alt_uri}")
+                        return True
+                    except Exception as e:
+                        st.warning(f"⚠️ {alt_uri} başarısız: {str(e)[:50]}...")
+                        continue
+            
+            # Tüm alternatifler başarısız
+            diag = self.diagnose_neo4j_connectivity()
+            if diag:
+                st.info(diag)
+            self.neo4j_driver = None
+            return False
+                
         except Exception as e:
             st.error(f"Neo4j bağlantı hatası: {e}")
             diag = self.diagnose_neo4j_connectivity()
@@ -41,27 +131,56 @@ class Neo4jTool:
 
     def diagnose_neo4j_connectivity(self) -> str:
         try:
-            # Yalnızca verify_connectivity ile teşhis
-            temp_driver = None
-            driver = self.neo4j_driver
-            if driver is None and self.neo4j_uri and self.neo4j_username and self.neo4j_password:
-                temp_driver = GraphDatabase.driver(self.neo4j_uri, auth=(self.neo4j_username, self.neo4j_password))
-                driver = temp_driver
+            if not (self.neo4j_uri and self.neo4j_username and self.neo4j_password):
+                return "Neo4j: ❌ Ortam değişkenleri eksik (NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD)"
+            
+            # URI formatını kontrol et
+            uri = self.neo4j_uri
+            if not uri.startswith(('neo4j://', 'neo4j+s://', 'bolt://', 'bolt+s://')):
+                return f"Neo4j: ❌ URI formatı hatalı: {uri}\nDoğru format: neo4j+s://hostname:port"
+            
+            # DNS çözümleme testi
+            import socket
             try:
-                if driver is None:
-                    return "Neo4j: ❌ sürücü oluşturulamadı; ortam değişkenlerini kontrol edin"
-                driver.verify_connectivity()
-                return "Neo4j: ✅ verify_connectivity başarılı"
-            except Exception as ve:
-                return f"Neo4j: ❌ verify_connectivity hata ({ve})"
-            finally:
-                if temp_driver is not None:
-                    try:
-                        temp_driver.close()
-                    except Exception:
-                        pass
-        except Exception:
-            return ""
+                from urllib.parse import urlparse
+                parsed = urlparse(uri)
+                host = parsed.hostname
+                port = parsed.port or 7687
+                
+                # DNS çözümleme
+                socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+                dns_status = f"DNS: ✅ {host} çözümlendi"
+            except Exception as e:
+                dns_status = f"DNS: ❌ {host} çözümlenemedi ({e})"
+            
+            # Bağlantı testi
+            try:
+                # URI tipine göre ayarları belirle
+                if uri.startswith(('neo4j+s://', 'bolt+s://')):
+                    # SSL URI'leri için encryption ayarları kullanma
+                    temp_driver = GraphDatabase.driver(
+                        uri, 
+                        auth=(self.neo4j_username, self.neo4j_password)
+                    )
+                else:
+                    # Diğer URI'ler için encryption ayarları
+                    temp_driver = GraphDatabase.driver(
+                        uri, 
+                        auth=(self.neo4j_username, self.neo4j_password),
+                        encrypted=True,
+                        trust="TRUST_SYSTEM_CA_SIGNED_CERTIFICATES"
+                    )
+                
+                temp_driver.verify_connectivity()
+                conn_status = "Neo4j: ✅ Bağlantı başarılı"
+                temp_driver.close()
+            except Exception as e:
+                conn_status = f"Neo4j: ❌ Bağlantı hatası ({e})"
+            
+            return f"{dns_status}\n{conn_status}\n\n💡 Öneriler:\n- .env dosyasında NEO4J_URI formatını kontrol edin\n- Neo4j Cloud hesabınızın aktif olduğundan emin olun\n- Şifrenizi doğru girdiğinizden emin olun"
+            
+        except Exception as e:
+            return f"Teşhis hatası: {e}"
 
     def run_cypher(self, cypher: str, params: Dict = None):
         if self.neo4j_driver is None:

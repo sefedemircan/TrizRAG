@@ -727,16 +727,40 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
         # Bağlantı ve şema
         colA, colB = st.columns([1, 2])
         with colA:
-            if st.button("🔌 Initialize Neo4j", use_container_width=True):
-                ok = neo4j_tool.initialize_neo4j()
-                if ok:
-                    st.success("✅ Neo4j connected!")
-                    st.rerun()
-                else:
-                    st.error("❌ Neo4j initialization failed!")
-
-            neo_status = "🟢 Connected" if neo4j_tool.neo4j_driver else "🔴 Disconnected"
-            st.markdown(f"**Connection:** {neo_status}")
+            st.subheader("🔌 Neo4j Connection")
+            
+            # Ortam değişkenleri kontrolü
+            if not os.getenv("NEO4J_URI"):
+                st.error("❌ NEO4J_URI ortam değişkeni bulunamadı!")
+                st.info("💡 .env dosyasında NEO4J_URI ayarlayın")
+            elif not os.getenv("NEO4J_USERNAME"):
+                st.error("❌ NEO4J_USERNAME ortam değişkeni bulunamadı!")
+                st.info("💡 .env dosyasında NEO4J_USERNAME ayarlayın")
+            elif not os.getenv("NEO4J_PASSWORD"):
+                st.error("❌ NEO4J_PASSWORD ortam değişkeni bulunamadı!")
+                st.info("💡 .env dosyasında NEO4J_PASSWORD ayarlayın")
+            else:
+                if st.button("🔌 Initialize Neo4j", use_container_width=True):
+                    with st.spinner("🔄 Neo4j bağlantısı kuruluyor..."):
+                        ok = neo4j_tool.initialize_neo4j()
+                        if ok:
+                            st.success("✅ Neo4j connected!")
+                            st.rerun()
+                        else:
+                            st.error("❌ Neo4j initialization failed!")
+                
+                # Bağlantı durumu
+                neo_status = "🟢 Connected" if neo4j_tool.neo4j_driver else "🔴 Disconnected"
+                st.markdown(f"**Connection:** {neo_status}")
+                
+                # URI bilgisi
+                if neo4j_tool.neo4j_uri:
+                    st.caption(f"URI: {neo4j_tool.neo4j_uri}")
+                
+                # Teşhis butonu
+                if st.button("🔍 Diagnose Connection", use_container_width=True):
+                    diag = neo4j_tool.diagnose_neo4j_connectivity()
+                    st.info(diag)
 
             if neo4j_tool.neo4j_driver:
                 schema = neo4j_tool.get_basic_schema()
