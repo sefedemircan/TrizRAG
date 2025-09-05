@@ -2493,3 +2493,236 @@ FROM table_b1e4208fe0533aa2e90ed8f9805143ad
 result = execute_sql_query(query)
 max_age = result[0][0]
 print(f'The biggest age value is: {max_age}')
+2025-09-05 13:58:41 [INFO] Question: What is the average Customer_Rating 
+2025-09-05 13:58:41 [INFO] Running PandasAI with litellm LLM...
+2025-09-05 13:58:41 [INFO] Prompt ID: 5c1e68b1-4652-416d-971c-85f3c8c4d622
+2025-09-05 13:58:41 [INFO] Generating new code...
+2025-09-05 13:58:41 [INFO] Using Prompt: <tables>
+
+<table dialect="duckdb" table_name="table_b365bb0176f64f3c46493d0214a770ac" columns="[{"name": "Date", "type": "datetime", "description": null, "expression": null, "alias": null}, {"name": "Category", "type": "string", "description": null, "expression": null, "alias": null}, {"name": "Sales_Amount", "type": "float", "description": null, "expression": null, "alias": null}, {"name": "Units_Sold", "type": "integer", "description": null, "expression": null, "alias": null}, {"name": "Customer_Rating", "type": "float", "description": null, "expression": null, "alias": null}, {"name": "Region", "type": "string", "description": null, "expression": null, "alias": null}]" dimensions="100x6">
+Date,Category,Sales_Amount,Units_Sold,Customer_Rating,Region
+2024-01-01,Home,731.0994450612094,54,4.5,West
+2024-01-02,Sports,966.4036538479176,59,1.9,West
+2024-01-03,Books,1440.6823856297178,60,4.6,South
+2024-01-04,Sports,662.8304996379891,64,3.4,West
+2024-01-05,Sports,1285.001618652154,54,2.4,East
+</table>
+
+
+</tables>
+
+You are already provided with the following functions that you can call:
+<function>
+def execute_sql_query(sql_query: str) -> pd.Dataframe
+    """This method connects to the database, executes the sql query and returns the dataframe"""
+</function>
+
+
+Update this initial code:
+```python
+# TODO: import the required dependencies
+import pandas as pd
+
+# Write code here
+
+# Declare result var: 
+type (possible values "string", "number", "dataframe", "plot"). Examples: { "type": "string", "value": f"The highest salary is {highest_salary}." } or { "type": "number", "value": 125 } or { "type": "dataframe", "value": pd.DataFrame({...}) } or { "type": "plot", "value": "temp_chart.png" }
+
+```
+
+
+
+### QUERY
+ What is the average Customer_Rating 
+
+At the end, declare "result" variable as a dictionary of type and value.
+
+
+Generate python code and return full updated code:
+
+### Note: Use only relevant table for query and do aggregation, sorting, joins and grouby through sql query
+2025-09-05 13:58:47 [INFO] Code Generated:
+# Import the required dependencies
+import pandas as pd
+
+# Declare the SQL query to calculate the average Customer_Rating
+sql_query = """
+    SELECT AVG(Customer_Rating) AS average_rating
+    FROM table_b365bb0176f64f3c46493d0214a770ac
+"""
+
+# Execute the SQL query and get the result as a DataFrame
+result_df = execute_sql_query(sql_query)
+
+# Get the average Customer_Rating from the DataFrame
+average_rating = result_df.iloc[0]['average_rating']
+
+# Declare the result variable
+result = {
+    "type": "number",
+    "value": average_rating
+}
+2025-09-05 13:58:47 [INFO] Validating code requirements...
+2025-09-05 13:58:47 [INFO] Code validation successful.
+2025-09-05 13:58:47 [INFO] Cleaning the generated code...
+2025-09-05 13:58:47 [INFO] Executing code: import pandas as pd
+sql_query = """
+    SELECT AVG(Customer_Rating) AS average_rating
+    FROM table_b365bb0176f64f3c46493d0214a770ac
+"""
+result_df = execute_sql_query(sql_query)
+average_rating = result_df.iloc[0]['average_rating']
+result = {'type': 'number', 'value': average_rating}
+2025-09-05 14:02:26 [INFO] Question: What is the average Customer_Rating 
+2025-09-05 14:02:26 [INFO] Running PandasAI with litellm LLM...
+2025-09-05 14:02:26 [INFO] Prompt ID: cc4ead62-6204-48b6-a817-5a2da2f70505
+2025-09-05 14:02:26 [INFO] Generating new code...
+2025-09-05 14:02:26 [INFO] Using Prompt: <tables>
+
+<table dialect="duckdb" table_name="table_b365bb0176f64f3c46493d0214a770ac" columns="[{"name": "Date", "type": "datetime", "description": null, "expression": null, "alias": null}, {"name": "Category", "type": "string", "description": null, "expression": null, "alias": null}, {"name": "Sales_Amount", "type": "float", "description": null, "expression": null, "alias": null}, {"name": "Units_Sold", "type": "integer", "description": null, "expression": null, "alias": null}, {"name": "Customer_Rating", "type": "float", "description": null, "expression": null, "alias": null}, {"name": "Region", "type": "string", "description": null, "expression": null, "alias": null}]" dimensions="100x6">
+Date,Category,Sales_Amount,Units_Sold,Customer_Rating,Region
+2024-01-01,Home,731.0994450612094,54,4.5,West
+2024-01-02,Sports,966.4036538479176,59,1.9,West
+2024-01-03,Books,1440.6823856297178,60,4.6,South
+2024-01-04,Sports,662.8304996379891,64,3.4,West
+2024-01-05,Sports,1285.001618652154,54,2.4,East
+</table>
+
+
+</tables>
+
+You are already provided with the following functions that you can call:
+<function>
+def execute_sql_query(sql_query: str) -> pd.Dataframe
+    """This method connects to the database, executes the sql query and returns the dataframe"""
+</function>
+
+
+Update this initial code:
+```python
+# TODO: import the required dependencies
+import pandas as pd
+
+# Write code here
+
+# Declare result var: 
+type (possible values "string", "number", "dataframe", "plot"). Examples: { "type": "string", "value": f"The highest salary is {highest_salary}." } or { "type": "number", "value": 125 } or { "type": "dataframe", "value": pd.DataFrame({...}) } or { "type": "plot", "value": "temp_chart.png" }
+
+```
+
+
+
+### QUERY
+ What is the average Customer_Rating 
+
+At the end, declare "result" variable as a dictionary of type and value.
+
+
+Generate python code and return full updated code:
+
+### Note: Use only relevant table for query and do aggregation, sorting, joins and grouby through sql query
+2025-09-05 14:02:29 [INFO] Code Generated:
+# TODO: import the required dependencies
+import pandas as pd
+
+# Execute SQL query to get average customer rating
+query = """
+SELECT AVG(Customer_Rating) as Average_Rating
+FROM table_b365bb0176f64f3c46493d0214a770ac
+"""
+result_df = execute_sql_query(query)
+
+# Convert the result to a string with appropriate formatting
+average_rating = result_df['Average_Rating'].values[0]
+average_rating_str = f"The average customer rating is {average_rating:.2f}"
+
+# Declare result var:
+result = {
+    "type": "string",
+    "value": average_rating_str
+}
+2025-09-05 14:02:29 [INFO] Validating code requirements...
+2025-09-05 14:02:29 [INFO] Code validation successful.
+2025-09-05 14:02:29 [INFO] Cleaning the generated code...
+2025-09-05 14:02:29 [INFO] Executing code: import pandas as pd
+query = """
+SELECT AVG(Customer_Rating) as Average_Rating
+FROM table_b365bb0176f64f3c46493d0214a770ac
+"""
+result_df = execute_sql_query(query)
+average_rating = result_df['Average_Rating'].values[0]
+average_rating_str = f'The average customer rating is {average_rating:.2f}'
+result = {'type': 'string', 'value': average_rating_str}
+2025-09-05 14:10:03 [INFO] Question: What is the average Customer_Rating 
+2025-09-05 14:10:04 [INFO] Running PandasAI with litellm LLM...
+2025-09-05 14:10:04 [INFO] Prompt ID: 9cbb3154-6040-43f8-9338-9f063c3be212
+2025-09-05 14:10:04 [INFO] Generating new code...
+2025-09-05 14:10:04 [INFO] Using Prompt: <tables>
+
+<table dialect="duckdb" table_name="table_b365bb0176f64f3c46493d0214a770ac" columns="[{"name": "Date", "type": "datetime", "description": null, "expression": null, "alias": null}, {"name": "Category", "type": "string", "description": null, "expression": null, "alias": null}, {"name": "Sales_Amount", "type": "float", "description": null, "expression": null, "alias": null}, {"name": "Units_Sold", "type": "integer", "description": null, "expression": null, "alias": null}, {"name": "Customer_Rating", "type": "float", "description": null, "expression": null, "alias": null}, {"name": "Region", "type": "string", "description": null, "expression": null, "alias": null}]" dimensions="100x6">
+Date,Category,Sales_Amount,Units_Sold,Customer_Rating,Region
+2024-01-01,Home,731.0994450612094,54,4.5,West
+2024-01-02,Sports,966.4036538479176,59,1.9,West
+2024-01-03,Books,1440.6823856297178,60,4.6,South
+2024-01-04,Sports,662.8304996379891,64,3.4,West
+2024-01-05,Sports,1285.001618652154,54,2.4,East
+</table>
+
+
+</tables>
+
+You are already provided with the following functions that you can call:
+<function>
+def execute_sql_query(sql_query: str) -> pd.Dataframe
+    """This method connects to the database, executes the sql query and returns the dataframe"""
+</function>
+
+
+Update this initial code:
+```python
+# TODO: import the required dependencies
+import pandas as pd
+
+# Write code here
+
+# Declare result var: 
+type (possible values "string", "number", "dataframe", "plot"). Examples: { "type": "string", "value": f"The highest salary is {highest_salary}." } or { "type": "number", "value": 125 } or { "type": "dataframe", "value": pd.DataFrame({...}) } or { "type": "plot", "value": "temp_chart.png" }
+
+```
+
+
+
+### QUERY
+ What is the average Customer_Rating 
+
+At the end, declare "result" variable as a dictionary of type and value.
+
+
+Generate python code and return full updated code:
+
+### Note: Use only relevant table for query and do aggregation, sorting, joins and grouby through sql query
+2025-09-05 14:10:07 [INFO] Code Generated:
+# TODO: import the required dependencies
+import pandas as pd
+
+# Write code here
+query = """
+SELECT AVG(Customer_Rating) as average_customer_rating
+FROM table_b365bb0176f64f3c46493d0214a770ac
+"""
+result_df = execute_sql_query(query)
+average_rating = result_df.iloc[0, 0]
+
+# Declare result var:
+result = { "type": "number", "value": average_rating }
+2025-09-05 14:10:07 [INFO] Validating code requirements...
+2025-09-05 14:10:07 [INFO] Code validation successful.
+2025-09-05 14:10:07 [INFO] Cleaning the generated code...
+2025-09-05 14:10:07 [INFO] Executing code: import pandas as pd
+query = """
+SELECT AVG(Customer_Rating) as average_customer_rating
+FROM table_b365bb0176f64f3c46493d0214a770ac
+"""
+result_df = execute_sql_query(query)
+average_rating = result_df.iloc[0, 0]
+result = {'type': 'number', 'value': average_rating}

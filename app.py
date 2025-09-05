@@ -589,31 +589,42 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
                     )
                 
                 if st.button("🔍 Analyze with AI", type="primary", use_container_width=True) and analysis_query:
-                    #  PI key kontrolü
+                    # API key kontrolü
                     if not os.getenv("OPENROUTER_API_KEY"):
-                        st.error("❌API key bulunamadı. Lütfen .env dosyasında OPENROUTER_API_KEY'i ayarlayın.")
+                        st.error("❌ API key bulunamadı. Lütfen .env dosyasında OPENROUTER_API_KEY'i ayarlayın.")
                     else:
-                        # AI analizi yap
-                        analysis_result = analytics_tool.analyze_data_with_pandasai(df, analysis_query)
-                        
-                        if analysis_result["success"]:
-                            # Sonucu göster
-                            st.subheader("🎯 AI Analysis Result")
-                            st.markdown(f"""
-                            <div class="success-message">
-                                {analysis_result["response"]}
-                            </div>
-                            """, unsafe_allow_html=True)
-                            
-                            # Analiz geçmişine ekle
-                            st.session_state.data_analysis_history.append({
-                                "query": analysis_query,
-                                "response": analysis_result["response"],
-                                "timestamp": datetime.now().strftime("%H:%M:%S")
-                            })
-                            
-                        else:
-                            st.error(f"❌ Analysis failed: {analysis_result['error']}")
+                        # Basit loading mesajı - spinner kullanma
+                        with st.spinner("🤖 AI analyzing your data... (This may take up to 20 seconds)"):
+                            try:
+                                # AI analizi yap
+                                analysis_result = analytics_tool.analyze_data_with_pandasai(df, analysis_query)
+                                
+                                if analysis_result["success"]:
+                                    # Sonucu göster
+                                    st.subheader("🎯 AI Analysis Result")
+                                    st.markdown(f"""
+                                    <div class="success-message">
+                                        {analysis_result["response"]}
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    # Analiz geçmişine ekle
+                                    st.session_state.data_analysis_history.append({
+                                        "query": analysis_query,
+                                        "response": analysis_result["response"],
+                                        "timestamp": datetime.now().strftime("%H:%M:%S")
+                                    })
+                                    
+                                    # Başarı mesajı
+                                    st.success("✅ Analiz başarıyla tamamlandı!")
+                                    
+                                else:
+                                    st.error(f"❌ Analysis failed: {analysis_result['error']}")
+                                    
+                            except Exception as e:
+                                st.error(f"❌ Beklenmeyen hata: {str(e)}")
+                                # Yedek analiz öner
+                                st.info("💡 Alternatif olarak manuel görselleştirme araçlarını kullanabilirsiniz.")
                 
                 # Görselleştirme önerileri
                 st.subheader("📊 Visualization Suggestions")

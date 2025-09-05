@@ -28,11 +28,8 @@ class Neo4jTool:
                 st.error("Neo4j bilgileri eksik. Lütfen .env ayarlarını kontrol edin.")
                 return False
             self.neo4j_driver = GraphDatabase.driver(self.neo4j_uri, auth=(self.neo4j_username, self.neo4j_password))
-            try:
-                self.neo4j_driver.verify_connectivity()
-            except Exception:
-                with self.neo4j_driver.session(database=self.neo4j_database) as session:
-                    session.run("RETURN 1 AS ok").single()
+            # Yalnızca verify_connectivity ile doğrulama
+            self.neo4j_driver.verify_connectivity()
             return True
         except Exception as e:
             st.error(f"Neo4j bağlantı hatası: {e}")
@@ -44,25 +41,25 @@ class Neo4jTool:
 
     def diagnose_neo4j_connectivity(self) -> str:
         try:
-            parsed = urlparse(self.neo4j_uri)
-            host = parsed.hostname or ""
-            port = parsed.port or 7687
-            hints = []
+            # Yalnızca verify_connectivity ile teşhis
+            temp_driver = None
+            driver = self.neo4j_driver
+            if driver is None and self.neo4j_uri and self.neo4j_username and self.neo4j_password:
+                temp_driver = GraphDatabase.driver(self.neo4j_uri, auth=(self.neo4j_username, self.neo4j_password))
+                driver = temp_driver
             try:
-                socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
-                hints.append("DNS: ✅ çözümlendi")
-            except Exception as e:
-                hints.append(f"DNS: ❌ çözümlenemedi ({e})")
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(2)
-                s.connect((host, port))
-                s.close()
-                hints.append(f"Port {port}: ✅ erişilebilir")
-            except Exception as e:
-                hints.append(f"Port {port}: ❌ erişilemedi ({e})")
-            ps = f"PowerShell ile test: Test-NetConnection {host} -Port {port}"
-            return "\n".join(hints + [ps])
+                if driver is None:
+                    return "Neo4j: ❌ sürücü oluşturulamadı; ortam değişkenlerini kontrol edin"
+                driver.verify_connectivity()
+                return "Neo4j: ✅ verify_connectivity başarılı"
+            except Exception as ve:
+                return f"Neo4j: ❌ verify_connectivity hata ({ve})"
+            finally:
+                if temp_driver is not None:
+                    try:
+                        temp_driver.close()
+                    except Exception:
+                        pass
         except Exception:
             return ""
 
