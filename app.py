@@ -158,7 +158,7 @@ def main():
     with st.sidebar:
         # Logo ve başlık
         st.markdown("""
-        <div style="text-align: center; padding: 1rem 0;">
+        <div style="text-align: center; padding: 0rem 0;">
             <h2 style="color: #ff4a4a; margin-bottom: 0;">🚀 TrizRAG</h2>
             <p style="color: #666; font-size: 0.9rem; margin: 0;">Control Panel</p>
         </div>
@@ -172,6 +172,7 @@ def main():
             with st.spinner("🚀 Initializing TrizRAG..."):
                 embedding_success = rag_tool.load_embedding_model()
                 chromadb_success = rag_tool.initialize_chromadb()
+                neo4j_success = neo4j_tool.initialize_neo4j()
                 
 
                 if embedding_success and chromadb_success:
@@ -237,9 +238,13 @@ def main():
         </div>
         """, unsafe_allow_html=True)
 
-        
-
-        # ChromaDB Cloud bilgileri
+        neo4j_status = "🟢 Connected" if neo4j_tool.neo4j_driver else "🔴 Disconnected"
+        st.markdown(f"""
+        <div style="display: flex; align-items: center; margin: 0.5rem 0;">
+            <span class="status-indicator {'status-connected' if neo4j_tool.neo4j_driver else 'status-disconnected'}"></span>
+            <span><strong>Neo4j:</strong> {neo4j_status}</span>
+        </div>
+        """, unsafe_allow_html=True)
 
 
         # Collection istatistikleri
@@ -725,50 +730,9 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
         """, unsafe_allow_html=True)
 
         # Bağlantı ve şema
-        colA, colB = st.columns([1, 2])
-        with colA:
-            st.subheader("🔌 Neo4j Connection")
-            
-            # Ortam değişkenleri kontrolü
-            if not os.getenv("NEO4J_URI"):
-                st.error("❌ NEO4J_URI ortam değişkeni bulunamadı!")
-                st.info("💡 .env dosyasında NEO4J_URI ayarlayın")
-            elif not os.getenv("NEO4J_USERNAME"):
-                st.error("❌ NEO4J_USERNAME ortam değişkeni bulunamadı!")
-                st.info("💡 .env dosyasında NEO4J_USERNAME ayarlayın")
-            elif not os.getenv("NEO4J_PASSWORD"):
-                st.error("❌ NEO4J_PASSWORD ortam değişkeni bulunamadı!")
-                st.info("💡 .env dosyasında NEO4J_PASSWORD ayarlayın")
-            else:
-                if st.button("🔌 Initialize Neo4j", use_container_width=True):
-                    with st.spinner("🔄 Neo4j bağlantısı kuruluyor..."):
-                        ok = neo4j_tool.initialize_neo4j()
-                        if ok:
-                            st.success("✅ Neo4j connected!")
-                            st.rerun()
-                        else:
-                            st.error("❌ Neo4j initialization failed!")
-                
-                # Bağlantı durumu
-                neo_status = "🟢 Connected" if neo4j_tool.neo4j_driver else "🔴 Disconnected"
-                st.markdown(f"**Connection:** {neo_status}")
-                
-                # URI bilgisi
-                if neo4j_tool.neo4j_uri:
-                    st.caption(f"URI: {neo4j_tool.neo4j_uri}")
-                
-                # Teşhis butonu
-                if st.button("🔍 Diagnose Connection", use_container_width=True):
-                    diag = neo4j_tool.diagnose_neo4j_connectivity()
-                    st.info(diag)
+        
 
-            if neo4j_tool.neo4j_driver:
-                schema = neo4j_tool.get_basic_schema()
-                with st.expander("📚 Basic Schema"):
-                    st.write("Labels:", schema.get("labels", []))
-                    st.write("Relationships:", schema.get("relationships", []))
-
-        with colB:
+        with st.container():
             st.subheader("💬 Ask the Graph")
             if "neo4j_messages" not in st.session_state:
                 st.session_state.neo4j_messages = []
