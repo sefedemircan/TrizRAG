@@ -720,7 +720,7 @@ OpenRouter, farklı AI modellerine tek bir API üzerinden erişim sağlayan plat
         st.header("🕸️ Neo4j Graph Chat")
         st.markdown("""
         <div class="help-tooltip">
-            <strong>💡 Neo4j Graph Chat:</strong> Doğal dilde soru sorun, sistem soruyu Cypher'a çevirip graf üzerinde çalıştırır.
+            <strong>💡 Neo4j Graph Chat:</strong> Ask a question in natural language, the system translates the question into Cypher and runs it on the graph.
         </div>
         """, unsafe_allow_html=True)
 
